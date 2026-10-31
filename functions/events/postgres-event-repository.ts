@@ -222,30 +222,28 @@ export class PostgresEventRepository implements EventRepository {
         return null;
       }
 
-      const [slotResult, responseResult, availabilityResult] = await Promise.all([
-        client.query<CandidateSlotRow>(
-          `SELECT id, candidate_date::text, slot_index
-           FROM candidate_slots
-           WHERE event_id = $1
-           ORDER BY candidate_date, slot_index`,
-          [eventId],
-        ),
-        client.query<ResponseRow>(
-          `SELECT id, display_name, comment, created_at, updated_at
-           FROM responses
-           WHERE event_id = $1
-           ORDER BY created_at, id`,
-          [eventId],
-        ),
-        client.query<AvailabilityRow>(
-          `SELECT a.response_id, a.candidate_slot_id, a.mark
-           FROM response_availability a
-           JOIN responses r ON r.id = a.response_id
-           WHERE r.event_id = $1
-           ORDER BY a.response_id, a.candidate_slot_id`,
-          [eventId],
-        ),
-      ]);
+      const slotResult = await client.query<CandidateSlotRow>(
+        `SELECT id, candidate_date::text, slot_index
+         FROM candidate_slots
+         WHERE event_id = $1
+         ORDER BY candidate_date, slot_index`,
+        [eventId],
+      );
+      const responseResult = await client.query<ResponseRow>(
+        `SELECT id, display_name, comment, created_at, updated_at
+         FROM responses
+         WHERE event_id = $1
+         ORDER BY created_at, id`,
+        [eventId],
+      );
+      const availabilityResult = await client.query<AvailabilityRow>(
+        `SELECT a.response_id, a.candidate_slot_id, a.mark
+         FROM response_availability a
+         JOIN responses r ON r.id = a.response_id
+         WHERE r.event_id = $1
+         ORDER BY a.response_id, a.candidate_slot_id`,
+        [eventId],
+      );
       const availabilityByResponse = new Map<string, PublicResponse['availability']>();
       for (const row of availabilityResult.rows) {
         const availability = availabilityByResponse.get(row.response_id) ?? [];

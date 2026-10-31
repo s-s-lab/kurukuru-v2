@@ -11,12 +11,23 @@ const timestamp = '2026-10-31T00:00:00.000Z';
 
 // This boundary double rejects weaker isolation and independent pool reads. Real
 // PostgreSQL interleavings are covered in postgres-event-snapshot.integration.test.ts.
-function snapshotPool(options: { missing?: boolean; failAvailability?: Error } = {}) {
+function snapshotPool(options: {
+  missing?: boolean;
+  failAvailability?: Error;
+  rejectConcurrent?: boolean;
+} = {}) {
   let active = false;
+  let queryInFlight = false;
   let released = false;
   let outcome: string | undefined;
   const client = {
     async query(sql: string) {
+      if (options.rejectConcurrent && queryInFlight) {
+        throw new Error('Concurrent queries on one PostgreSQL client are not supported.');
+      }
+      queryInFlight = true;
+      await Promise.resolve();
+      try {
       if (sql === 'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY') {
         active = true;
         return { rows: [] };
@@ -43,6 +54,9 @@ function snapshotPool(options: { missing?: boolean; failAvailability?: Error } =
         return { rows: [{ response_id: responseId, candidate_slot_id: slotId, mark: 'ok' }] };
       }
       throw new Error(`Unexpected query: ${sql}`);
+      } finally {
+        queryInFlight = false;
+      }
     },
     release() { released = true; },
   };
@@ -72,6 +86,15 @@ describe('公開イベント読取のトランザクション境界', () => {
   it('イベントが見つからない場合も読取をコミットして接続を解放する', async () => {
     const boundary = snapshotPool({ missing: true });
     expect(await new PostgresEventRepository(boundary.pool).getPublicEvent(eventId)).toBeNull();
+    expect(boundary.outcome()).toBe('COMMIT');
+    expect(boundary.released()).toBe(true);
+  });
+
+  it('同一のPostgreSQLクライアントではクエリを直列に実行する', async () => {
+    const boundary = snapshotPool({ rejectConcurrent: true });
+    await expect(
+      new PostgresEventRepository(boundary.pool).getPublicEvent(eventId),
+    ).resolves.toMatchObject({ id: eventId });
     expect(boundary.outcome()).toBe('COMMIT');
     expect(boundary.released()).toBe(true);
   });
