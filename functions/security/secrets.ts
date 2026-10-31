@@ -1,5 +1,6 @@
 import {
   createHash,
+  createHmac,
   randomBytes,
   scrypt as scryptCallback,
   timingSafeEqual,
@@ -8,6 +9,10 @@ import { promisify } from 'node:util';
 
 const scrypt = promisify(scryptCallback);
 const PASSWORD_KEY_LENGTH = 64;
+
+export function deriveResponseEditToken(secret: string, responseId: string): string {
+  return createHmac('sha256', secret).update('response-edit:' + responseId).digest('base64url');
+}
 
 export function generateOpaqueToken(): string {
   return randomBytes(32).toString('base64url');
