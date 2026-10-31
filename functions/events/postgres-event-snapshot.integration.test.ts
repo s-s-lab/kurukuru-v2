@@ -86,7 +86,7 @@ describe.skipIf(!pool)('公開イベントのPostgreSQL共有スナップショ�
         if (/FROM responses\s/.test(sql)) await gate.committed;
       },
       async (sql) => {
-        if (!/FROM response_availability/.test(sql)) return;
+        if (!/FROM candidate_slots/.test(sql)) return;
         try {
           const created = await writer.createResponse(input);
           createdId = created.response.id;
