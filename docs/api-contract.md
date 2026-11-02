@@ -9,6 +9,7 @@
 | POST | `/events/:eventId/responses` | 公開・レート制限・冪等キー | 回答登録と編集リンク発行 |
 | PATCH | `/responses/:responseId` | 回答編集トークン | 回答編集 |
 | POST | `/events/:eventId/admin/sessions` | 管理パスワード・レート制限 | 短命管理セッション発行 |
+| GET | `/events/:eventId/admin` | 管理セッション | 非公開情報を含む管理状態取得 |
 | PATCH | `/events/:eventId` | 管理セッション | 基本情報・通知設定変更 |
 | PUT | `/events/:eventId/candidate-slots` | 管理セッション | 候補枠の差分更新 |
 | POST | `/events/:eventId/finalization` | 管理セッション | 連続枠で日時確定 |
@@ -66,6 +67,30 @@
 
 422は`fieldErrors`も返す。編集認証の失敗は回答の存在を隠す404とする。
 レート制限はPOST全体300回/分・イベント120回/10分、PATCH全体300回/分・回答60回/10分。429には`Retry-After`を付ける。
+
+## 管理認証・基本管理（実装済み）
+
+`POST /events/:eventId/admin/sessions`は`{ "password": "..." }`を受け取り、成功時に12時間有効の`sessionToken`、`expiresAt`、`event`を201で返す。トークンは強いランダム値を一度だけ返し、DBにはSHA-256ハッシュだけを保存する。全体60回/分、イベント10回/10分で制限する。
+
+`GET /events/:eventId/admin`、`PATCH /events/:eventId`、`POST /events/:eventId/close`、`POST /events/:eventId/reopen`は`Authorization: Bearer <sessionToken>`を必須とする。管理操作は全体300回/分、イベント120回/10分で制限する。期限切れ、不正、別イベント用のセッション、イベント不明・削除済みは、存在を追加開示しない`404 ADMIN_ACCESS_DENIED`へ統一する。
+
+セッショントークンまたは非公開管理情報を含む可能性がある全管理レスポンスは`Cache-Control: no-store`を返す。
+
+管理状態は公開イベントの項目に`organizerEmail`、`organizerEmailVerified`、`notifyOnResponse`、`version`を加える。管理パスワード、セッションハッシュ、メール認証トークン、配送情報は返さない。
+
+`PATCH /events/:eventId`は次の全項目を送る。タイトルと説明はtrimして保存する。主催者メールの変更はメール再認証APIと同時に後続実装する。
+
+```json
+{
+  "title": "更新後のタイトル",
+  "description": "説明",
+  "notifyOnResponse": true
+}
+```
+
+- `title`：trim後1〜120文字、`description`：trim後0〜2000文字。
+- close済みイベントへのclose、openイベントへのreopenは成功扱いとし、`version`と`updatedAt`を変更しない。
+- 管理APIのJSON本文上限は16KiB。入力不正は`422 VALIDATION_ERROR`、サービス未構成は`503 SERVICE_UNAVAILABLE`を返す。
 
 ### Function環境設定とdevelopmentスモーク
 

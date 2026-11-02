@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 
+import { AdminAccessDeniedError, type AdminService } from './admin/service';
+import { adminEventUpdateSchema, adminSessionRequestSchema } from './admin/validation';
 import { IdempotencyConflictError } from './events/postgres-event-repository';
 import type { EventService } from './events/service';
 import { createEventRequestSchema } from './events/validation';
@@ -19,6 +21,7 @@ type AppConfig = {
   allowedOrigins: readonly string[];
   eventService?: EventService;
   responseService?: ResponseService;
+  adminService?: AdminService;
   rateLimiter?: RequestRateLimiter;
 };
 
@@ -334,6 +337,119 @@ export function createApp(config: AppConfig) {
     return context.json(result, 200);
   });
 
+  function readAdminAccess(context: Context<AppEnvironment>) {
+    const rawEventId = context.req.param('eventId');
+    const sessionToken = extractBearerToken(context.req.header('authorization'));
+    if (!rawEventId || !sessionToken) {
+      throw new AdminAccessDeniedError();
+    }
+    const eventId = rawEventId.toLowerCase();
+    if (!z.uuid().safeParse(eventId).success) throw new AdminAccessDeniedError();
+    return { eventId, sessionToken };
+  }
+
+  async function enforceAdminOperationLimits(
+    context: Context<AppEnvironment>,
+    eventId: string,
+  ) {
+    return await enforceRateLimit(context, {
+      scope: 'admin-operation-global', subject: 'all', limit: 300, windowSeconds: 60,
+    }) ?? await enforceRateLimit(context, {
+      scope: 'admin-operation-event', subject: eventId, limit: 120, windowSeconds: 600,
+    });
+  }
+
+  function preventAdminResponseCaching(context: Context<AppEnvironment>) {
+    context.header('cache-control', 'no-store');
+  }
+
+  app.post('/api/v1/events/:eventId/admin/sessions', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const eventId = context.req.param('eventId').toLowerCase();
+    if (!z.uuid().safeParse(eventId).success) throw new AdminAccessDeniedError();
+    const limited = await enforceRateLimit(context, {
+      scope: 'create-admin-session-global', subject: 'all', limit: 60, windowSeconds: 60,
+    }) ?? await enforceRateLimit(context, {
+      scope: 'create-admin-session-event', subject: eventId, limit: 10, windowSeconds: 600,
+    });
+    if (limited) return limited;
+
+    const body = await readJsonBody(context.req.raw, 16 * 1024);
+    if (body.error) return context.json({ ...body.error, requestId }, body.status);
+    const parsed = adminSessionRequestSchema.safeParse(body.input);
+    if (!parsed.success) {
+      return context.json({
+        code: 'VALIDATION_ERROR',
+        message: '入力内容を確認してください。',
+        fieldErrors: validationFieldErrors(parsed.error),
+        requestId,
+      }, 422);
+    }
+    if (!config.adminService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    return context.json(await config.adminService.createSession({
+      eventId,
+      password: parsed.data.password,
+    }), 201);
+  });
+
+  app.get('/api/v1/events/:eventId/admin', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const access = readAdminAccess(context);
+    const limited = await enforceAdminOperationLimits(context, access.eventId);
+    if (limited) return limited;
+    if (!config.adminService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    return context.json(await config.adminService.getEvent(access));
+  });
+
+  app.patch('/api/v1/events/:eventId', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const access = readAdminAccess(context);
+    const limited = await enforceAdminOperationLimits(context, access.eventId);
+    if (limited) return limited;
+    const body = await readJsonBody(context.req.raw, 16 * 1024);
+    if (body.error) return context.json({ ...body.error, requestId }, body.status);
+    const parsed = adminEventUpdateSchema.safeParse(body.input);
+    if (!parsed.success) {
+      return context.json({
+        code: 'VALIDATION_ERROR',
+        message: '入力内容を確認してください。',
+        fieldErrors: validationFieldErrors(parsed.error),
+        requestId,
+      }, 422);
+    }
+    if (!config.adminService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    return context.json(await config.adminService.updateEvent({ ...access, request: parsed.data }));
+  });
+
+  async function changeEventStatus(
+    context: Context<AppEnvironment>,
+    action: 'closeEvent' | 'reopenEvent',
+  ) {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const access = readAdminAccess(context);
+    const limited = await enforceAdminOperationLimits(context, access.eventId);
+    if (limited) return limited;
+    if (!config.adminService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    return context.json(await config.adminService[action](access));
+  }
+
+  app.post('/api/v1/events/:eventId/close', (context) =>
+    changeEventStatus(context, 'closeEvent'));
+  app.post('/api/v1/events/:eventId/reopen', (context) =>
+    changeEventStatus(context, 'reopenEvent'));
+
   app.onError((error, context) => {
     const requestId = context.get('requestId') ?? randomUUID();
     if (error instanceof IdempotencyConflictError) {
@@ -360,8 +476,14 @@ export function createApp(config: AppConfig) {
     if (error instanceof ResponseNotFoundError) {
       return context.json({ code: 'RESPONSE_NOT_FOUND', message: '回答が見つかりません。', requestId }, 404);
     }
+    if (error instanceof AdminAccessDeniedError) {
+      return context.json({ code: 'ADMIN_ACCESS_DENIED', message: '管理画面へアクセスできません。', requestId }, 404);
+    }
 
-    console.error({ requestId, error });
+    console.error({
+      requestId,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
     return context.json(
       {
         code: 'INTERNAL_ERROR',
