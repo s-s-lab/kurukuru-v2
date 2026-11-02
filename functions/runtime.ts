@@ -1,11 +1,14 @@
 import { Pool } from 'pg';
 
+import { createAdminService } from './admin/admin-service';
+import { PostgresAdminRepository } from './admin/postgres-admin-repository';
 import { createApp } from './app';
 import { createResponseService } from './responses/response-service';
 import { PostgresResponseRepository } from './responses/postgres-response-repository';
 import { createEventService } from './events/event-service';
 import { PostgresEventRepository } from './events/postgres-event-repository';
 import { PostgresRequestRateLimiter } from './security/rate-limit';
+import { generateOpaqueToken, verifyPassword } from './security/secrets';
 
 type RuntimeEnvironment = {
   DATABASE_URL?: string;
@@ -15,6 +18,8 @@ type RuntimeEnvironment = {
 
 type RuntimeDependencies = {
   createPool: (connectionString: string) => Pool;
+  verifyAdminPassword: (password: string, encoded: string) => Promise<boolean>;
+  generateAdminToken: () => string;
 };
 
 const defaultDependencies: RuntimeDependencies = {
@@ -26,6 +31,8 @@ const defaultDependencies: RuntimeDependencies = {
       idleTimeoutMillis: 30_000,
       query_timeout: 10_000,
     }),
+  verifyAdminPassword: verifyPassword,
+  generateAdminToken: generateOpaqueToken,
 };
 
 export function createRuntimeApp(
@@ -58,6 +65,10 @@ export function createRuntimeApp(
     new PostgresResponseRepository(pool),
     environment.KURUKURU_TOKEN_SECRET,
   );
+  const adminService = createAdminService(new PostgresAdminRepository(pool), {
+    verifyPassword: dependencies.verifyAdminPassword,
+    generateToken: dependencies.generateAdminToken,
+  });
 
-  return createApp({ allowedOrigins, eventService, responseService, rateLimiter });
+  return createApp({ allowedOrigins, eventService, responseService, adminService, rateLimiter });
 }

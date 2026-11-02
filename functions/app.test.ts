@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 
+import { AdminAccessDeniedError } from './admin/service';
+import type { AdminEvent, AdminService } from './admin/service';
 import { createApp } from './app';
 import { IdempotencyConflictError } from './events/postgres-event-repository';
 import type { EventService } from './events/service';
@@ -355,10 +357,15 @@ function responseHeaders() {
   return { 'content-type': 'application/json', 'idempotency-key': 'response-create-0001', authorization: 'Bearer edit-token', 'x-request-id': 'response-request-id' };
 }
 
-async function expectResponseError(response: Response, status: number, code: string) {
+async function expectResponseError(
+  response: Response,
+  status: number,
+  code: string,
+  requestId = 'response-request-id',
+) {
   expect(response.status).toBe(status);
-  expect(response.headers.get('x-request-id')).toBe('response-request-id');
-  await expect(response.json()).resolves.toMatchObject({ code, message: expect.any(String), requestId: 'response-request-id' });
+  expect(response.headers.get('x-request-id')).toBe(requestId);
+  await expect(response.json()).resolves.toMatchObject({ code, message: expect.any(String), requestId });
 }
 
 describe('回答API', () => {
@@ -516,4 +523,252 @@ describe('回答API', () => {
       });
     });
   }
+});
+
+const adminEvent: AdminEvent = {
+  id: eventId,
+  title: '研究会の日程調整',
+  description: '参加できる時間を選択してください。',
+  organizerEmail: 'organizer@example.com',
+  organizerEmailVerified: false,
+  notifyOnResponse: true,
+  status: 'open',
+  finalization: null,
+  version: 1,
+  createdAt: '2026-10-29T07:00:00.000Z',
+  updatedAt: '2026-10-29T07:00:00.000Z',
+  candidateSlots: [],
+  responses: [],
+};
+
+function adminServiceFake(): AdminService {
+  return {
+    createSession: vi.fn(async () => ({
+      sessionToken: 'plain-admin-session-token',
+      expiresAt: '2026-11-02T12:00:00.000Z',
+      event: adminEvent,
+    })),
+    getEvent: vi.fn(async () => adminEvent),
+    updateEvent: vi.fn(async () => ({ ...adminEvent, title: '更新後', version: 2 })),
+    closeEvent: vi.fn(async () => ({ ...adminEvent, status: 'closed' as const, version: 2 })),
+    reopenEvent: vi.fn(async () => adminEvent),
+  };
+}
+
+function adminHeaders() {
+  return {
+    'content-type': 'application/json',
+    authorization: 'Bearer plain-admin-session-token',
+    'x-request-id': 'admin-request-id',
+  };
+}
+
+function expectAdminError(response: Response, status: number, code: string) {
+  return expectResponseError(response, status, code, 'admin-request-id');
+}
+
+describe('管理コアAPI', () => {
+  it('管理パスワードから短命セッションを発行し秘密ハッシュを返さない', async () => {
+    const adminService = adminServiceFake();
+    const app = createApp({ allowedOrigins: [], adminService });
+    const response = await app.request(`/api/v1/events/${eventId.toUpperCase()}/admin/sessions`, {
+      method: 'POST',
+      headers: adminHeaders(),
+      body: JSON.stringify({ password: 'correct horse battery staple' }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(adminService.createSession).toHaveBeenCalledWith({
+      eventId,
+      password: 'correct horse battery staple',
+    });
+    expect(body).toMatchObject({
+      sessionToken: 'plain-admin-session-token',
+      event: { id: eventId, organizerEmail: 'organizer@example.com' },
+    });
+    expect(JSON.stringify(body)).not.toContain('hash');
+    expect(JSON.stringify(body)).not.toContain('correct horse battery staple');
+  });
+
+  it('Bearer認証で管理状態取得・基本情報更新・受付停止・再開を行う', async () => {
+    const adminService = adminServiceFake();
+    const app = createApp({ allowedOrigins: [], adminService });
+    const update = { title: '  更新後  ', description: '  新しい説明  ', notifyOnResponse: false };
+
+    const found = await app.request(`/api/v1/events/${eventId}/admin`, { headers: adminHeaders() });
+    const updated = await app.request(`/api/v1/events/${eventId}`, {
+      method: 'PATCH', headers: adminHeaders(), body: JSON.stringify(update),
+    });
+    const closed = await app.request(`/api/v1/events/${eventId}/close`, { method: 'POST', headers: adminHeaders() });
+    const reopened = await app.request(`/api/v1/events/${eventId}/reopen`, { method: 'POST', headers: adminHeaders() });
+
+    expect([found.status, updated.status, closed.status, reopened.status]).toEqual([200, 200, 200, 200]);
+    expect(adminService.getEvent).toHaveBeenCalledWith({ eventId, sessionToken: 'plain-admin-session-token' });
+    expect(adminService.updateEvent).toHaveBeenCalledWith({
+      eventId,
+      sessionToken: 'plain-admin-session-token',
+      request: { title: '更新後', description: '新しい説明', notifyOnResponse: false },
+    });
+    expect(adminService.closeEvent).toHaveBeenCalledWith({ eventId, sessionToken: 'plain-admin-session-token' });
+    expect(adminService.reopenEvent).toHaveBeenCalledWith({ eventId, sessionToken: 'plain-admin-session-token' });
+  });
+
+  it('セッションと非公開管理情報を返す全レスポンスをキャッシュさせない', async () => {
+    const app = createApp({ allowedOrigins: [], adminService: adminServiceFake() });
+    const responses = await Promise.all([
+      app.request(`/api/v1/events/${eventId}/admin/sessions`, {
+        method: 'POST', headers: adminHeaders(), body: JSON.stringify({ password: 'admin-password' }),
+      }),
+      app.request(`/api/v1/events/${eventId}/admin`, { headers: adminHeaders() }),
+      app.request(`/api/v1/events/${eventId}`, {
+        method: 'PATCH',
+        headers: adminHeaders(),
+        body: JSON.stringify({ title: '更新', description: '', notifyOnResponse: true }),
+      }),
+      app.request(`/api/v1/events/${eventId}/close`, { method: 'POST', headers: adminHeaders() }),
+      app.request(`/api/v1/events/${eventId}/reopen`, { method: 'POST', headers: adminHeaders() }),
+    ]);
+
+    expect(responses.map((response) => response.headers.get('cache-control')))
+      .toEqual(['no-store', 'no-store', 'no-store', 'no-store', 'no-store']);
+  });
+
+  it.each([undefined, '', 'Basic token', 'Bearer', 'Bearer token extra'])(
+    'Bearer欠落・形式不正 %s をサービスへ渡さず404にする',
+    async (authorization) => {
+      const adminService = adminServiceFake();
+      const headers: Record<string, string> = adminHeaders();
+      if (authorization === undefined) delete headers.authorization;
+      else headers.authorization = authorization;
+      const app = createApp({ allowedOrigins: [], adminService });
+      const response = await app.request(`/api/v1/events/${eventId}/admin`, { headers });
+
+      await expectAdminError(response, 404, 'ADMIN_ACCESS_DENIED');
+      expect(adminService.getEvent).not.toHaveBeenCalled();
+    },
+  );
+
+  it('ログインと更新の入力不正をfieldErrors付き422で返す', async () => {
+    const adminService = adminServiceFake();
+    const app = createApp({ allowedOrigins: [], adminService });
+    const login = await app.request(`/api/v1/events/${eventId}/admin/sessions`, {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify({ password: '' }),
+    });
+    const update = await app.request(`/api/v1/events/${eventId}`, {
+      method: 'PATCH', headers: adminHeaders(), body: JSON.stringify({ title: '', description: '', notifyOnResponse: 'yes' }),
+    });
+
+    expect(login.status).toBe(422);
+    await expect(login.json()).resolves.toMatchObject({ code: 'VALIDATION_ERROR', fieldErrors: { password: expect.any(Array) } });
+    expect(update.status).toBe(422);
+    await expect(update.json()).resolves.toMatchObject({ code: 'VALIDATION_ERROR', fieldErrors: { title: expect.any(Array), notifyOnResponse: expect.any(Array) } });
+    expect(adminService.createSession).not.toHaveBeenCalled();
+    expect(adminService.updateEvent).not.toHaveBeenCalled();
+  });
+
+  it('16KiBを超える管理本文を413で拒否する', async () => {
+    const adminService = adminServiceFake();
+    const app = createApp({ allowedOrigins: [], adminService });
+    const response = await app.request(`/api/v1/events/${eventId}/admin/sessions`, {
+      method: 'POST',
+      headers: { ...adminHeaders(), 'content-length': String(16 * 1024 + 1) },
+      body: '{}',
+    });
+
+    await expectAdminError(response, 413, 'PAYLOAD_TOO_LARGE');
+    expect(adminService.createSession).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 1])('ログインの全体・イベント制限 index %s を先に適用する', async (deniedIndex) => {
+    const adminService = adminServiceFake();
+    const rateLimiter: RequestRateLimiter = { check: vi.fn(async () => ({ allowed: true, retryAfterSeconds: 1 })) };
+    vi.mocked(rateLimiter.check)
+      .mockResolvedValueOnce({ allowed: deniedIndex !== 0, retryAfterSeconds: 42 })
+      .mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 84 });
+    const app = createApp({ allowedOrigins: [], adminService, rateLimiter });
+    const response = await app.request(`/api/v1/events/${eventId}/admin/sessions`, {
+      method: 'POST', headers: adminHeaders(), body: deniedIndex === 0 ? '{' : JSON.stringify({ password: 'admin-password' }),
+    });
+
+    await expectAdminError(response, 429, 'RATE_LIMIT_EXCEEDED');
+    expect(rateLimiter.check).toHaveBeenNthCalledWith(1, {
+      scope: 'create-admin-session-global', subject: 'all', limit: 60, windowSeconds: 60,
+    });
+    if (deniedIndex === 1) expect(rateLimiter.check).toHaveBeenNthCalledWith(2, {
+      scope: 'create-admin-session-event', subject: eventId, limit: 10, windowSeconds: 600,
+    });
+  });
+
+  it('管理操作へ全体・イベント制限を適用する', async () => {
+    const adminService = adminServiceFake();
+    const rateLimiter: RequestRateLimiter = {
+      check: vi.fn()
+        .mockResolvedValueOnce({ allowed: true, retryAfterSeconds: 1 })
+        .mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 90 }),
+    };
+    const app = createApp({ allowedOrigins: [], adminService, rateLimiter });
+    const response = await app.request(`/api/v1/events/${eventId}/close`, { method: 'POST', headers: adminHeaders() });
+
+    await expectAdminError(response, 429, 'RATE_LIMIT_EXCEEDED');
+    expect(rateLimiter.check).toHaveBeenNthCalledWith(1, {
+      scope: 'admin-operation-global', subject: 'all', limit: 300, windowSeconds: 60,
+    });
+    expect(rateLimiter.check).toHaveBeenNthCalledWith(2, {
+      scope: 'admin-operation-event', subject: eventId, limit: 120, windowSeconds: 600,
+    });
+    expect(adminService.closeEvent).not.toHaveBeenCalled();
+  });
+
+  it('認証拒否を安全な404へ写像する', async () => {
+    const adminService = adminServiceFake();
+    vi.mocked(adminService.createSession).mockRejectedValue(new AdminAccessDeniedError());
+    const app = createApp({ allowedOrigins: [], adminService });
+    const response = await app.request(`/api/v1/events/${eventId}/admin/sessions`, {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify({ password: 'wrong-password' }),
+    });
+
+    await expectAdminError(response, 404, 'ADMIN_ACCESS_DENIED');
+  });
+
+  it('未知の管理エラーを応答にもログにも露出しない', async () => {
+    const adminService = adminServiceFake();
+    vi.mocked(adminService.createSession).mockRejectedValue(
+      new Error('password=private-password token_hash=private-session-hash'),
+    );
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const app = createApp({ allowedOrigins: [], adminService });
+      const response = await app.request(`/api/v1/events/${eventId}/admin/sessions`, {
+        method: 'POST', headers: adminHeaders(), body: JSON.stringify({ password: 'private-password' }),
+      });
+      const body = await response.text();
+
+      expect(response.status).toBe(500);
+      expect(body).not.toContain('private-password');
+      expect(body).not.toContain('private-session-hash');
+      const logged = errorLog.mock.calls.flatMap((arguments_) => arguments_.map((argument) => {
+        if (typeof argument === 'object' && argument && 'error' in argument) {
+          return String(argument.error);
+        }
+        return String(argument);
+      })).join(' ');
+      expect(logged).not.toContain('private-password');
+      expect(logged).not.toContain('private-session-hash');
+    } finally {
+      errorLog.mockRestore();
+    }
+  });
+
+  it('管理サービス未構成と不正UUIDを安全に拒否する', async () => {
+    const adminService = adminServiceFake();
+    const appWithoutService = createApp({ allowedOrigins: [] });
+    const unavailable = await appWithoutService.request(`/api/v1/events/${eventId}/admin`, { headers: adminHeaders() });
+    await expectAdminError(unavailable, 503, 'SERVICE_UNAVAILABLE');
+
+    const app = createApp({ allowedOrigins: [], adminService });
+    const invalid = await app.request('/api/v1/events/not-a-uuid/admin', { headers: adminHeaders() });
+    await expectAdminError(invalid, 404, 'ADMIN_ACCESS_DENIED');
+    expect(adminService.getEvent).not.toHaveBeenCalled();
+  });
 });

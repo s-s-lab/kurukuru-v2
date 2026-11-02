@@ -2,6 +2,8 @@
 import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { AdminEvent } from './admin/service';
+import { PostgresAdminRepository } from './admin/postgres-admin-repository';
 import { createRuntimeApp } from './runtime';
 import { PostgresResponseRepository } from './responses/postgres-response-repository';
 import { deriveResponseEditToken, hashOpaqueToken } from './security/secrets';
@@ -66,6 +68,59 @@ describe('回答APIランタイム', () => {
     } finally {
       create.mockRestore();
       update.mockRestore();
+    }
+  });
+});
+
+describe('管理APIランタイム', () => {
+  it('Postgres管理リポジトリと秘密処理を管理セッション発行へ配線する', async () => {
+    const adminEvent: AdminEvent = {
+      id: '9bed1489-b31f-4b6d-8dcb-e8d95109f98c',
+      title: '管理イベント',
+      description: '',
+      organizerEmail: 'organizer@example.com',
+      organizerEmailVerified: false,
+      notifyOnResponse: true,
+      status: 'open',
+      finalization: null,
+      version: 1,
+      createdAt: '2026-11-02T00:00:00.000Z',
+      updatedAt: '2026-11-02T00:00:00.000Z',
+      candidateSlots: [],
+      responses: [],
+    };
+    const findPasswordHash = vi.spyOn(PostgresAdminRepository.prototype, 'findPasswordHash')
+      .mockResolvedValue('scrypt$invalid-but-controlled');
+    const createSession = vi.spyOn(PostgresAdminRepository.prototype, 'createSession')
+      .mockResolvedValue(adminEvent);
+    const pool = { query: vi.fn(async () => ({ rows: [{ request_count: 1, retry_after_seconds: 60 }] })) } as unknown as Pool;
+    try {
+      const app = createRuntimeApp(
+        { DATABASE_URL: 'postgresql://runtime.example/kurukuru', KURUKURU_TOKEN_SECRET: 's'.repeat(32) },
+        {
+          createPool: () => pool,
+          verifyAdminPassword: vi.fn().mockResolvedValue(true),
+          generateAdminToken: () => 'runtime-admin-token',
+        },
+      );
+      const response = await app.request(`/api/v1/events/${adminEvent.id}/admin/sessions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password: 'runtime-password' }),
+      });
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toMatchObject({ sessionToken: 'runtime-admin-token', event: adminEvent });
+      expect(findPasswordHash).toHaveBeenCalledWith(adminEvent.id);
+      expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+        eventId: adminEvent.id,
+        tokenHash: hashOpaqueToken('runtime-admin-token'),
+        expiresAt: expect.any(Date),
+      }));
+      expect(JSON.stringify(createSession.mock.calls)).not.toContain('runtime-password');
+    } finally {
+      findPasswordHash.mockRestore();
+      createSession.mockRestore();
     }
   });
 });
