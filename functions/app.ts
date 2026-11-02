@@ -2,8 +2,18 @@ import { randomUUID } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 
-import { AdminAccessDeniedError, type AdminService } from './admin/service';
-import { adminEventUpdateSchema, adminSessionRequestSchema } from './admin/validation';
+import {
+  AdminAccessDeniedError,
+  EventFinalizedError,
+  InvalidFinalizationError,
+  type AdminService,
+} from './admin/service';
+import {
+  adminCandidateSlotsSchema,
+  adminEventUpdateSchema,
+  adminFinalizationSchema,
+  adminSessionRequestSchema,
+} from './admin/validation';
 import { IdempotencyConflictError } from './events/postgres-event-repository';
 import type { EventService } from './events/service';
 import { createEventRequestSchema } from './events/validation';
@@ -450,6 +460,83 @@ export function createApp(config: AppConfig) {
   app.post('/api/v1/events/:eventId/reopen', (context) =>
     changeEventStatus(context, 'reopenEvent'));
 
+  app.put('/api/v1/events/:eventId/candidate-slots', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const access = readAdminAccess(context);
+    const limited = await enforceAdminOperationLimits(context, access.eventId);
+    if (limited) return limited;
+    const body = await readJsonBody(context.req.raw, 16 * 1024);
+    if (body.error) return context.json({ ...body.error, requestId }, body.status);
+    const parsed = adminCandidateSlotsSchema.safeParse(body.input);
+    if (!parsed.success) {
+      return context.json({
+        code: 'VALIDATION_ERROR',
+        message: '入力内容を確認してください。',
+        fieldErrors: validationFieldErrors(parsed.error),
+        requestId,
+      }, 422);
+    }
+    if (!config.adminService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    return context.json(await config.adminService.replaceCandidateSlots({
+      ...access,
+      request: parsed.data,
+    }));
+  });
+
+  app.post('/api/v1/events/:eventId/finalization', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const access = readAdminAccess(context);
+    const limited = await enforceAdminOperationLimits(context, access.eventId);
+    if (limited) return limited;
+    const body = await readJsonBody(context.req.raw, 16 * 1024);
+    if (body.error) return context.json({ ...body.error, requestId }, body.status);
+    const parsed = adminFinalizationSchema.safeParse(body.input);
+    if (!parsed.success) {
+      return context.json({
+        code: 'VALIDATION_ERROR',
+        message: '入力内容を確認してください。',
+        fieldErrors: validationFieldErrors(parsed.error),
+        requestId,
+      }, 422);
+    }
+    if (!config.adminService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    return context.json(await config.adminService.setFinalization({
+      ...access,
+      request: parsed.data,
+    }));
+  });
+
+  app.delete('/api/v1/events/:eventId/finalization', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const access = readAdminAccess(context);
+    const limited = await enforceAdminOperationLimits(context, access.eventId);
+    if (limited) return limited;
+    if (!config.adminService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    return context.json(await config.adminService.clearFinalization(access));
+  });
+
+  app.delete('/api/v1/events/:eventId', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const access = readAdminAccess(context);
+    const limited = await enforceAdminOperationLimits(context, access.eventId);
+    if (limited) return limited;
+    if (!config.adminService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    await config.adminService.deleteEvent(access);
+    return context.body(null, 204);
+  });
+
   app.onError((error, context) => {
     const requestId = context.get('requestId') ?? randomUUID();
     if (error instanceof IdempotencyConflictError) {
@@ -478,6 +565,22 @@ export function createApp(config: AppConfig) {
     }
     if (error instanceof AdminAccessDeniedError) {
       return context.json({ code: 'ADMIN_ACCESS_DENIED', message: '管理画面へアクセスできません。', requestId }, 404);
+    }
+    if (error instanceof EventFinalizedError) {
+      return context.json({
+        code: 'EVENT_FINALIZED',
+        message: '確定済みの候補枠は削除できません。先に日時確定を解除してください。',
+        requestId,
+      }, 409);
+    }
+    if (error instanceof InvalidFinalizationError) {
+      const message = '確定日時には連続した候補枠を指定してください。';
+      return context.json({
+        code: 'INVALID_FINALIZATION',
+        message,
+        fieldErrors: { finalization: [message] },
+        requestId,
+      }, 422);
     }
 
     console.error({

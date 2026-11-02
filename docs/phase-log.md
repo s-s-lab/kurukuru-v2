@@ -199,3 +199,30 @@ GitHubリポジトリを作成後、P3のイベント作成・回答APIをテス
 - 主催者用管理画面と、ブラウザ内での管理セッション保持・期限切れ再ログイン
 - 主催者メール変更・メール認証・通知配送
 - PostgreSQL 18を使うGitHub CIで管理統合テストを含む全件実行
+
+## 2026-11-02 P5 管理ライフサイクルAPI
+
+### 実装内容
+
+- `PUT /api/v1/events/:eventId/candidate-slots`：候補枠の全件置換。日付・枠順へ正規化し、保持枠のIDと回答を維持しながら差分だけを更新
+- 追加候補枠は既存の全回答へ`ng`を補完し、削除候補枠の回答可否は外部キーcascadeで削除。実差分がない再実行はversionとupdated_atを維持
+- 確定済み範囲の候補を外す更新は、書込み前に`409 EVENT_FINALIZED`としてトランザクションを中止
+- `POST /api/v1/events/:eventId/finalization`：同一日の連続した候補枠だけを、終了境界exclusiveで確定。不連続・候補外は`422 INVALID_FINALIZATION`
+- `DELETE /api/v1/events/:eventId/finalization`：確定を解除。同一確定の再設定と未確定状態への再解除は冪等
+- 確定と回答受付停止を独立操作のままとし、確定時にopen/closedを暗黙変更しない
+- `DELETE /api/v1/events/:eventId`：イベントを論理削除し、そのイベントの全管理セッションを同一トランザクションで失効。成功は本文なし204
+- 全操作へ既存の管理Bearer認証、二段階レート制限、16KiB本文上限、`Cache-Control: no-store`、秘密情報を隠す固定エラーを適用
+- 既存DBスキーマと外部キーを使用し、マイグレーション追加なし
+
+### 検証
+
+- TDDでバリデーション19件、管理サービス4件、PostgreSQL管理リポジトリ単体13件、管理HTTPを含むテストを追加・更新し、各REDからGREENを確認
+- 全体Vitest：236件成功、50件skip（`DATABASE_URL`未設定のPostgreSQL統合5ファイル）。管理リポジトリ統合3件には候補差分・ng補完・確定枠保護・確定/解除の冪等性・論理削除・全セッション失効を含む
+- ESLintエラー・警告0、TypeScript/Viteビルド、Functionビルド、Functionバンドルヘルスが成功
+- `git diff --check`で空白エラーなし。既知のnpm `Unknown env config "http-proxy"`警告は継続
+
+### 残課題
+
+- 主催者用管理画面と、ブラウザ内での管理セッション保持・期限切れ再ログイン
+- 主催者メール変更・メール認証・通知配送
+- PostgreSQL 18を使うGitHub CIで、新規管理統合3件を含む全件実行

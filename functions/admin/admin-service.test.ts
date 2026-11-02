@@ -30,6 +30,10 @@ function repository(overrides: Partial<AdminRepository> = {}): AdminRepository {
     getAdminEvent: vi.fn().mockResolvedValue(adminEvent),
     updateEvent: vi.fn().mockResolvedValue(adminEvent),
     setEventStatus: vi.fn().mockResolvedValue(adminEvent),
+    replaceCandidateSlots: vi.fn().mockResolvedValue(adminEvent),
+    setFinalization: vi.fn().mockResolvedValue(adminEvent),
+    clearFinalization: vi.fn().mockResolvedValue(adminEvent),
+    deleteEvent: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -117,6 +121,54 @@ describe('admin service', () => {
       eventId,
       tokenHash: 'sha256:plain-session-token',
       status: 'open',
+    });
+    expect(JSON.stringify(adminRepository)).not.toContain(sessionToken);
+  });
+
+  it('delegates lifecycle commands with only the session token hash', async () => {
+    const adminRepository = repository();
+    const service = createAdminService(adminRepository, {
+      now: () => now,
+      verifyPassword: vi.fn(),
+      generateToken: () => 'unused',
+      hashToken: (token) => `sha256:${token}`,
+    });
+    const sessionToken = 'plain-session-token';
+    const candidateRequest = {
+      candidateSlots: [{ date: '2026-11-10', slotIndexes: [18, 19] }],
+    };
+    const finalizationRequest = { date: '2026-11-10', startSlot: 18, endSlot: 20 };
+
+    await expect(service.replaceCandidateSlots({
+      eventId,
+      sessionToken,
+      request: candidateRequest,
+    })).resolves.toEqual(adminEvent);
+    await expect(service.setFinalization({
+      eventId,
+      sessionToken,
+      request: finalizationRequest,
+    })).resolves.toEqual(adminEvent);
+    await expect(service.clearFinalization({ eventId, sessionToken })).resolves.toEqual(adminEvent);
+    await expect(service.deleteEvent({ eventId, sessionToken })).resolves.toBeUndefined();
+
+    expect(adminRepository.replaceCandidateSlots).toHaveBeenCalledWith({
+      eventId,
+      tokenHash: 'sha256:plain-session-token',
+      request: candidateRequest,
+    });
+    expect(adminRepository.setFinalization).toHaveBeenCalledWith({
+      eventId,
+      tokenHash: 'sha256:plain-session-token',
+      request: finalizationRequest,
+    });
+    expect(adminRepository.clearFinalization).toHaveBeenCalledWith({
+      eventId,
+      tokenHash: 'sha256:plain-session-token',
+    });
+    expect(adminRepository.deleteEvent).toHaveBeenCalledWith({
+      eventId,
+      tokenHash: 'sha256:plain-session-token',
     });
     expect(JSON.stringify(adminRepository)).not.toContain(sessionToken);
   });

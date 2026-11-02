@@ -81,5 +81,35 @@ export function createAdminService(
         status: 'open',
       });
     },
+
+    replaceCandidateSlots(command) {
+      return repository.replaceCandidateSlots({
+        eventId: command.eventId,
+        tokenHash: tokenHash(command.sessionToken),
+        request: command.request,
+      });
+    },
+
+    setFinalization(command) {
+      return repository.setFinalization({
+        eventId: command.eventId,
+        tokenHash: tokenHash(command.sessionToken),
+        request: command.request,
+      });
+    },
+
+    clearFinalization(command) {
+      return repository.clearFinalization({
+        eventId: command.eventId,
+        tokenHash: tokenHash(command.sessionToken),
+      });
+    },
+
+    deleteEvent(command) {
+      return repository.deleteEvent({
+        eventId: command.eventId,
+        tokenHash: tokenHash(command.sessionToken),
+      });
+    },
   };
 }

@@ -92,6 +92,48 @@
 - close済みイベントへのclose、openイベントへのreopenは成功扱いとし、`version`と`updatedAt`を変更しない。
 - 管理APIのJSON本文上限は16KiB。入力不正は`422 VALIDATION_ERROR`、サービス未構成は`503 SERVICE_UNAVAILABLE`を返す。
 
+## 管理ライフサイクル（実装済み）
+
+次の操作も管理セッション、管理操作レート制限（全体300回/分・イベント120回/10分）、16KiB本文上限、`Cache-Control: no-store`を共通で適用する。
+
+### 候補枠の全件置換
+
+`PUT /events/:eventId/candidate-slots`は差分断片ではなく、更新後に残す候補枠の全件を送る。
+
+```json
+{
+  "candidateSlots": [
+    { "date": "2026-11-10", "slotIndexes": [18, 19, 20] }
+  ]
+}
+```
+
+- 候補日はISO日付、1〜20日、日付重複不可。各日は12〜47の整数枠を1〜36件、重複なく指定する（最大720枠）。
+- 日付・枠順へ正規化し、既存の同一枠はIDと回答を保持する。追加枠は既存の全回答へ`ng`を補完し、削除枠の回答可否は候補枠とともに削除する。
+- 正規化後に同一なら`version`と`updatedAt`を変更しない。
+- 確定範囲の枠を取り除く更新は`409 EVENT_FINALIZED`。先に確定を解除する。
+
+### 日時確定と解除
+
+`POST /events/:eventId/finalization`は同一日の連続した候補枠を確定する。`endSlot`は終了境界（exclusive）で、次の例は18・19・20番枠を確定する。
+
+```json
+{
+  "date": "2026-11-10",
+  "startSlot": 18,
+  "endSlot": 21
+}
+```
+
+- `startSlot`は12〜47、`endSlot`は13〜48かつ`startSlot`より大きい整数。
+- `[startSlot, endSlot)`の全枠がその日の候補として存在しない場合は`422 INVALID_FINALIZATION`と`fieldErrors.finalization`を返す。
+- 同じ確定を繰り返しても`version`と`updatedAt`を変更しない。確定しても回答受付状態は自動変更しない。
+- `DELETE /events/:eventId/finalization`は確定を解除する。未確定状態への再実行も成功し、状態を変更しない。成功時はいずれも`AdminEvent`を返す。
+
+### イベントの論理削除
+
+`DELETE /events/:eventId`はイベントを論理削除し、同じトランザクションでそのイベントの全管理セッションを失効させる。成功時は本文なしの`204`。以後の公開取得ではイベント不明、管理アクセスでは`404 ADMIN_ACCESS_DENIED`となる。
+
 ### Function環境設定とdevelopmentスモーク
 
 `DATABASE_URL`に加え`KURUKURU_TOKEN_SECRET`が必須。秘密値は32文字以上の強いランダム値をFunction環境だけへ設定する（`VITE_`接頭辞を付けない）。未設定または32文字未満では起動を拒否する。

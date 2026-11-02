@@ -30,6 +30,19 @@ export type AdminEventUpdateRequest = {
   notifyOnResponse: boolean;
 };
 
+export type AdminCandidateSlotsRequest = {
+  candidateSlots: Array<{
+    date: string;
+    slotIndexes: number[];
+  }>;
+};
+
+export type AdminFinalizationRequest = {
+  date: string;
+  startSlot: number;
+  endSlot: number;
+};
+
 export type AdminSessionResult = {
   sessionToken: string;
   expiresAt: string;
@@ -40,6 +53,20 @@ export class AdminAccessDeniedError extends Error {
   constructor() {
     super('Admin access was denied.');
     this.name = 'AdminAccessDeniedError';
+  }
+}
+
+export class EventFinalizedError extends Error {
+  constructor() {
+    super('Finalized candidate slots cannot be removed.');
+    this.name = 'EventFinalizedError';
+  }
+}
+
+export class InvalidFinalizationError extends Error {
+  constructor() {
+    super('Finalization must contain only continuous candidate slots.');
+    this.name = 'InvalidFinalizationError';
   }
 }
 
@@ -65,4 +92,22 @@ export interface AdminService {
     eventId: string;
     sessionToken: string;
   }): Promise<AdminEvent>;
+  replaceCandidateSlots(command: {
+    eventId: string;
+    sessionToken: string;
+    request: AdminCandidateSlotsRequest;
+  }): Promise<AdminEvent>;
+  setFinalization(command: {
+    eventId: string;
+    sessionToken: string;
+    request: AdminFinalizationRequest;
+  }): Promise<AdminEvent>;
+  clearFinalization(command: {
+    eventId: string;
+    sessionToken: string;
+  }): Promise<AdminEvent>;
+  deleteEvent(command: {
+    eventId: string;
+    sessionToken: string;
+  }): Promise<void>;
 }
