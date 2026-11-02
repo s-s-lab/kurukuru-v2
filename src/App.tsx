@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router-dom';
 import { BrandMark } from './components/BrandMark';
 import { HomePage } from './pages/HomePage';
 import { NewEventPage } from './pages/NewEventPage';
+import { ParticipantEventPage } from './pages/ParticipantEventPage';
 
 export function App() {
   return (
@@ -18,6 +19,9 @@ export function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/events/new" element={<NewEventPage />} />
+        <Route path="/events/:eventId" element={
+          <ParticipantEventPage apiBaseUrl={import.meta.env.VITE_API_BASE_URL || '/api/v1'} />
+        } />
       </Routes>
       <footer className="site-footer">
         <div className="shell">Kurukuru v2 — 予定を、時間で合わせる。</div>
