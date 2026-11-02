@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 
-import { AdminAccessDeniedError } from './admin/service';
+import {
+  AdminAccessDeniedError,
+  EventFinalizedError,
+  InvalidFinalizationError,
+} from './admin/service';
 import type { AdminEvent, AdminService } from './admin/service';
 import { createApp } from './app';
 import { IdempotencyConflictError } from './events/postgres-event-repository';
@@ -552,6 +556,10 @@ function adminServiceFake(): AdminService {
     updateEvent: vi.fn(async () => ({ ...adminEvent, title: '更新後', version: 2 })),
     closeEvent: vi.fn(async () => ({ ...adminEvent, status: 'closed' as const, version: 2 })),
     reopenEvent: vi.fn(async () => adminEvent),
+    replaceCandidateSlots: vi.fn(async () => adminEvent),
+    setFinalization: vi.fn(async () => adminEvent),
+    clearFinalization: vi.fn(async () => adminEvent),
+    deleteEvent: vi.fn(async () => undefined),
   };
 }
 
@@ -614,6 +622,61 @@ describe('管理コアAPI', () => {
     expect(adminService.reopenEvent).toHaveBeenCalledWith({ eventId, sessionToken: 'plain-admin-session-token' });
   });
 
+  it('候補枠置換・確定・確定解除・論理削除を正規化して委譲する', async () => {
+    const adminService = adminServiceFake();
+    const app = createApp({ allowedOrigins: [], adminService });
+    const candidates = await app.request(`/api/v1/events/${eventId.toUpperCase()}/candidate-slots`, {
+      method: 'PUT',
+      headers: adminHeaders(),
+      body: JSON.stringify({
+        candidateSlots: [
+          { date: '2026-11-12', slotIndexes: [20, 18] },
+          { date: '2026-11-10', slotIndexes: [13, 12] },
+        ],
+      }),
+    });
+    const finalized = await app.request(`/api/v1/events/${eventId}/finalization`, {
+      method: 'POST',
+      headers: adminHeaders(),
+      body: JSON.stringify({ date: '2026-11-10', startSlot: 12, endSlot: 14 }),
+    });
+    const cleared = await app.request(`/api/v1/events/${eventId}/finalization`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+    const deleted = await app.request(`/api/v1/events/${eventId}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+
+    expect([candidates.status, finalized.status, cleared.status, deleted.status])
+      .toEqual([200, 200, 200, 204]);
+    await expect(deleted.text()).resolves.toBe('');
+    expect(adminService.replaceCandidateSlots).toHaveBeenCalledWith({
+      eventId,
+      sessionToken: 'plain-admin-session-token',
+      request: {
+        candidateSlots: [
+          { date: '2026-11-10', slotIndexes: [12, 13] },
+          { date: '2026-11-12', slotIndexes: [18, 20] },
+        ],
+      },
+    });
+    expect(adminService.setFinalization).toHaveBeenCalledWith({
+      eventId,
+      sessionToken: 'plain-admin-session-token',
+      request: { date: '2026-11-10', startSlot: 12, endSlot: 14 },
+    });
+    expect(adminService.clearFinalization).toHaveBeenCalledWith({
+      eventId,
+      sessionToken: 'plain-admin-session-token',
+    });
+    expect(adminService.deleteEvent).toHaveBeenCalledWith({
+      eventId,
+      sessionToken: 'plain-admin-session-token',
+    });
+  });
+
   it('セッションと非公開管理情報を返す全レスポンスをキャッシュさせない', async () => {
     const app = createApp({ allowedOrigins: [], adminService: adminServiceFake() });
     const responses = await Promise.all([
@@ -628,10 +691,22 @@ describe('管理コアAPI', () => {
       }),
       app.request(`/api/v1/events/${eventId}/close`, { method: 'POST', headers: adminHeaders() }),
       app.request(`/api/v1/events/${eventId}/reopen`, { method: 'POST', headers: adminHeaders() }),
+      app.request(`/api/v1/events/${eventId}/candidate-slots`, {
+        method: 'PUT',
+        headers: adminHeaders(),
+        body: JSON.stringify({ candidateSlots: [{ date: '2026-11-10', slotIndexes: [18] }] }),
+      }),
+      app.request(`/api/v1/events/${eventId}/finalization`, {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify({ date: '2026-11-10', startSlot: 18, endSlot: 19 }),
+      }),
+      app.request(`/api/v1/events/${eventId}/finalization`, { method: 'DELETE', headers: adminHeaders() }),
+      app.request(`/api/v1/events/${eventId}`, { method: 'DELETE', headers: adminHeaders() }),
     ]);
 
     expect(responses.map((response) => response.headers.get('cache-control')))
-      .toEqual(['no-store', 'no-store', 'no-store', 'no-store', 'no-store']);
+      .toEqual(Array.from({ length: 9 }, () => 'no-store'));
   });
 
   it.each([undefined, '', 'Basic token', 'Bearer', 'Bearer token extra'])(
@@ -678,6 +753,67 @@ describe('管理コアAPI', () => {
 
     await expectAdminError(response, 413, 'PAYLOAD_TOO_LARGE');
     expect(adminService.createSession).not.toHaveBeenCalled();
+  });
+
+  it('候補枠と確定の不正入力および本文上限をサービスへ渡さず拒否する', async () => {
+    const adminService = adminServiceFake();
+    const app = createApp({ allowedOrigins: [], adminService });
+    const candidates = await app.request(`/api/v1/events/${eventId}/candidate-slots`, {
+      method: 'PUT',
+      headers: adminHeaders(),
+      body: JSON.stringify({ candidateSlots: [{ date: '2026-11-10', slotIndexes: [18, 18] }] }),
+    });
+    const finalized = await app.request(`/api/v1/events/${eventId}/finalization`, {
+      method: 'POST',
+      headers: adminHeaders(),
+      body: JSON.stringify({ date: '2026-11-10', startSlot: 20, endSlot: 20 }),
+    });
+    const tooLarge = await app.request(`/api/v1/events/${eventId}/candidate-slots`, {
+      method: 'PUT',
+      headers: { ...adminHeaders(), 'content-length': String(16 * 1024 + 1) },
+      body: '{}',
+    });
+
+    expect(candidates.status).toBe(422);
+    await expect(candidates.json()).resolves.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      fieldErrors: { candidateSlots: expect.any(Array) },
+    });
+    expect(finalized.status).toBe(422);
+    await expect(finalized.json()).resolves.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      fieldErrors: { endSlot: expect.any(Array) },
+    });
+    await expectAdminError(tooLarge, 413, 'PAYLOAD_TOO_LARGE');
+    expect(adminService.replaceCandidateSlots).not.toHaveBeenCalled();
+    expect(adminService.setFinalization).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [new EventFinalizedError(), 'EVENT_FINALIZED', 409, 'replaceCandidateSlots'],
+    [new InvalidFinalizationError(), 'INVALID_FINALIZATION', 422, 'setFinalization'],
+  ] as const)('管理ライフサイクルエラーを %s に写像する', async (error, code, status, method) => {
+    const adminService = adminServiceFake();
+    vi.mocked(adminService[method]).mockRejectedValue(error);
+    const app = createApp({ allowedOrigins: [], adminService });
+    const response = method === 'replaceCandidateSlots'
+      ? await app.request(`/api/v1/events/${eventId}/candidate-slots`, {
+        method: 'PUT',
+        headers: adminHeaders(),
+        body: JSON.stringify({ candidateSlots: [{ date: '2026-11-10', slotIndexes: [18] }] }),
+      })
+      : await app.request(`/api/v1/events/${eventId}/finalization`, {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify({ date: '2026-11-10', startSlot: 18, endSlot: 19 }),
+      });
+
+    expect(response.status).toBe(status);
+    const body = await response.json();
+    expect(body).toMatchObject({ code, requestId: 'admin-request-id' });
+    if (code === 'INVALID_FINALIZATION') {
+      expect(body).toMatchObject({ fieldErrors: { finalization: expect.any(Array) } });
+    }
   });
 
   it.each([0, 1])('ログインの全体・イベント制限 index %s を先に適用する', async (deniedIndex) => {

@@ -4,8 +4,12 @@ import type { AvailabilityMark, PublicCandidateSlot, PublicResponse } from '../e
 import type { AdminRepository } from './repository';
 import {
   AdminAccessDeniedError,
+  EventFinalizedError,
+  type AdminCandidateSlotsRequest,
   type AdminEvent,
   type AdminEventUpdateRequest,
+  type AdminFinalizationRequest,
+  InvalidFinalizationError,
 } from './service';
 
 type AdminEventRow = {
@@ -277,6 +281,182 @@ export class PostgresAdminRepository implements AdminRepository {
         event = updated.rows[0];
       }
       return loadAdminEvent(client, event);
+    });
+  }
+
+  replaceCandidateSlots(input: {
+    eventId: string;
+    tokenHash: string;
+    request: AdminCandidateSlotsRequest;
+  }): Promise<AdminEvent> {
+    return inTransaction(this.pool, 'BEGIN', async (client) => {
+      let event = await selectAuthorizedEvent(client, input.eventId, input.tokenHash, true);
+      const currentResult = await client.query<CandidateSlotRow>(
+        `SELECT id, candidate_date::text, slot_index
+         FROM candidate_slots
+         WHERE event_id = $1
+         ORDER BY candidate_date, slot_index
+         FOR UPDATE`,
+        [input.eventId],
+      );
+      const desired = input.request.candidateSlots.flatMap(({ date, slotIndexes }) =>
+        slotIndexes.map((slotIndex) => ({ date, slotIndex })));
+      const desiredKeys = new Set(desired.map(({ date, slotIndex }) => `${date}#${slotIndex}`));
+      const currentKeys = new Set(currentResult.rows.map(
+        ({ candidate_date: date, slot_index: slotIndex }) => `${date}#${slotIndex}`,
+      ));
+      const additions = desired.filter(
+        ({ date, slotIndex }) => !currentKeys.has(`${date}#${slotIndex}`),
+      );
+      const removals = currentResult.rows.filter(
+        ({ candidate_date: date, slot_index: slotIndex }) =>
+          !desiredKeys.has(`${date}#${slotIndex}`),
+      );
+
+      if (
+        event.final_date !== null
+        && event.final_start_slot !== null
+        && event.final_end_slot !== null
+      ) {
+        for (let slotIndex = event.final_start_slot; slotIndex < event.final_end_slot; slotIndex += 1) {
+          if (!desiredKeys.has(`${event.final_date}#${slotIndex}`)) {
+            throw new EventFinalizedError();
+          }
+        }
+      }
+
+      if (additions.length > 0) {
+        await client.query(
+          `WITH added AS (
+             INSERT INTO candidate_slots (event_id, candidate_date, slot_index)
+             SELECT $1, input.candidate_date::date, input.slot_index
+             FROM unnest($2::text[], $3::smallint[]) AS input(candidate_date, slot_index)
+             RETURNING id
+           )
+           INSERT INTO response_availability (response_id, candidate_slot_id, mark)
+           SELECT r.id, added.id, 'ng'
+           FROM responses r
+           CROSS JOIN added
+           WHERE r.event_id = $1`,
+          [
+            input.eventId,
+            additions.map(({ date }) => date),
+            additions.map(({ slotIndex }) => slotIndex),
+          ],
+        );
+      }
+      if (removals.length > 0) {
+        await client.query(
+          `DELETE FROM candidate_slots
+           WHERE event_id = $1 AND id = ANY($2::uuid[])`,
+          [input.eventId, removals.map(({ id }) => id)],
+        );
+      }
+      if (additions.length > 0 || removals.length > 0) {
+        const updated = await client.query<AdminEventRow>(
+          `UPDATE events
+           SET version = version + 1, updated_at = now()
+           WHERE id = $1
+           RETURNING id, title, description, organizer_email,
+             organizer_email_verified_at, notify_on_response, status,
+             final_date::text, final_start_slot, final_end_slot, version,
+             created_at, updated_at`,
+          [input.eventId],
+        );
+        event = updated.rows[0];
+      }
+      return loadAdminEvent(client, event);
+    });
+  }
+
+  setFinalization(input: {
+    eventId: string;
+    tokenHash: string;
+    request: AdminFinalizationRequest;
+  }): Promise<AdminEvent> {
+    return inTransaction(this.pool, 'BEGIN', async (client) => {
+      let event = await selectAuthorizedEvent(client, input.eventId, input.tokenHash, true);
+      if (
+        event.final_date === input.request.date
+        && event.final_start_slot === input.request.startSlot
+        && event.final_end_slot === input.request.endSlot
+      ) {
+        return loadAdminEvent(client, event);
+      }
+      const candidateResult = await client.query<{ slot_index: number }>(
+        `SELECT slot_index
+         FROM candidate_slots
+         WHERE event_id = $1 AND candidate_date = $2
+         ORDER BY slot_index
+         FOR SHARE`,
+        [input.eventId, input.request.date],
+      );
+      const candidateIndexes = new Set(candidateResult.rows.map(({ slot_index }) => slot_index));
+      for (
+        let slotIndex = input.request.startSlot;
+        slotIndex < input.request.endSlot;
+        slotIndex += 1
+      ) {
+        if (!candidateIndexes.has(slotIndex)) throw new InvalidFinalizationError();
+      }
+      const updated = await client.query<AdminEventRow>(
+        `UPDATE events
+         SET final_date = $2, final_start_slot = $3, final_end_slot = $4,
+             version = version + 1, updated_at = now()
+         WHERE id = $1
+         RETURNING id, title, description, organizer_email,
+           organizer_email_verified_at, notify_on_response, status,
+           final_date::text, final_start_slot, final_end_slot, version,
+           created_at, updated_at`,
+        [input.eventId, input.request.date, input.request.startSlot, input.request.endSlot],
+      );
+      event = updated.rows[0];
+      return loadAdminEvent(client, event);
+    });
+  }
+
+  clearFinalization(input: {
+    eventId: string;
+    tokenHash: string;
+  }): Promise<AdminEvent> {
+    return inTransaction(this.pool, 'BEGIN', async (client) => {
+      let event = await selectAuthorizedEvent(client, input.eventId, input.tokenHash, true);
+      if (
+        event.final_date !== null
+        || event.final_start_slot !== null
+        || event.final_end_slot !== null
+      ) {
+        const updated = await client.query<AdminEventRow>(
+          `UPDATE events
+           SET final_date = NULL, final_start_slot = NULL, final_end_slot = NULL,
+               version = version + 1, updated_at = now()
+           WHERE id = $1
+           RETURNING id, title, description, organizer_email,
+             organizer_email_verified_at, notify_on_response, status,
+             final_date::text, final_start_slot, final_end_slot, version,
+             created_at, updated_at`,
+          [input.eventId],
+        );
+        event = updated.rows[0];
+      }
+      return loadAdminEvent(client, event);
+    });
+  }
+
+  deleteEvent(input: {
+    eventId: string;
+    tokenHash: string;
+  }): Promise<void> {
+    return inTransaction(this.pool, 'BEGIN', async (client) => {
+      await selectAuthorizedEvent(client, input.eventId, input.tokenHash, true);
+      await client.query(
+        `UPDATE events
+         SET status = 'deleted', deleted_at = now(),
+             version = version + 1, updated_at = now()
+         WHERE id = $1`,
+        [input.eventId],
+      );
+      await client.query('DELETE FROM admin_sessions WHERE event_id = $1', [input.eventId]);
     });
   }
 }
