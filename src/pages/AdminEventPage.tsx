@@ -1,33 +1,46 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-import type { AdminEvent, AdminEventUpdateRequest } from '../../functions/admin/service';
+import type {
+  AdminEvent,
+  AdminEventUpdateRequest,
+  AdminFinalizationRequest,
+} from '../../functions/admin/service';
 import {
   AdminApiError,
+  clearAdminFinalization,
   closeAdminEvent,
   createAdminSession,
+  deleteAdminEvent,
   getAdminEvent,
+  replaceAdminCandidateSlots,
   reopenAdminEvent,
+  setAdminFinalization,
   updateAdminEvent,
 } from '../features/event-admin/admin-api';
+import { AdminCandidateEditor } from '../features/event-admin/AdminCandidateEditor';
+import { AdminDeleteControl } from '../features/event-admin/AdminDeleteControl';
 import { AdminEventHeader } from '../features/event-admin/AdminEventHeader';
 import { AdminEventSettings } from '../features/event-admin/AdminEventSettings';
 import { AdminEventStatusControl } from '../features/event-admin/AdminEventStatusControl';
+import { AdminFinalizationControl } from '../features/event-admin/AdminFinalizationControl';
 import { AdminLoginForm } from '../features/event-admin/AdminLoginForm';
 import { AdminResponseOverview } from '../features/event-admin/AdminResponseOverview';
+import { createCandidateRequest } from '../features/event-admin/admin-schedule-model';
 import {
   adminSessionStorageKey,
   readAdminSession,
   type StoredAdminSession,
   writeAdminSession,
 } from '../features/event-admin/admin-session';
+import type { CandidateDayDraft } from '../features/event-create/event-draft';
 
 type Props = {
   apiBaseUrl: string;
   fetcher?: typeof fetch;
 };
 
-type PageState = 'checking-session' | 'login' | 'authenticated';
+type PageState = 'checking-session' | 'login' | 'authenticated' | 'deleted';
 type AuthenticatedState = {
   eventId: string;
   event: AdminEvent;
@@ -57,6 +70,13 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
   const [statusMessage, setStatusMessage] = useState('');
   const [isSharing, setIsSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
+  const [lifecycleAction, setLifecycleAction] = useState<
+    null | 'candidates' | 'set-finalization' | 'clear-finalization' | 'delete'
+  >(null);
+  const [candidateRevision, setCandidateRevision] = useState(0);
+  const [candidateMessage, setCandidateMessage] = useState('');
+  const [finalizationMessage, setFinalizationMessage] = useState('');
+  const [deleteMessage, setDeleteMessage] = useState('');
   const storageKey = adminSessionStorageKey(eventId);
 
   useEffect(() => {
@@ -145,7 +165,8 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
   }
 
   async function save(request: AdminEventUpdateRequest) {
-    if (!authenticated || authenticated.eventId !== eventId || isSaving || isChangingStatus) return;
+    if (!authenticated || authenticated.eventId !== eventId
+      || isSaving || isChangingStatus || lifecycleAction !== null) return;
     const requestedEventId = eventId;
     const sessionToken = authenticated.session.sessionToken;
     setIsSaving(true);
@@ -171,7 +192,8 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
   }
 
   async function changeStatus(action: 'close' | 'reopen') {
-    if (!authenticated || authenticated.eventId !== eventId || isSaving || isChangingStatus) return;
+    if (!authenticated || authenticated.eventId !== eventId
+      || isSaving || isChangingStatus || lifecycleAction !== null) return;
     const requestedEventId = eventId;
     const sessionToken = authenticated.session.sessionToken;
     setIsChangingStatus(true);
@@ -219,6 +241,82 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
     }
   }
 
+  function replaceEvent(updated: AdminEvent, requestedEventId: string) {
+    setAuthenticated((current) => current?.eventId === requestedEventId
+      && updated.version >= current.event.version ? { ...current, event: updated } : current);
+  }
+
+  async function saveCandidates(days: CandidateDayDraft[]) {
+    if (!authenticated || authenticated.eventId !== eventId
+      || isSaving || isChangingStatus || lifecycleAction !== null) return;
+    const requestedEventId = eventId;
+    setLifecycleAction('candidates');
+    setCandidateMessage('');
+    try {
+      const updated = await replaceAdminCandidateSlots(eventId, createCandidateRequest(days), {
+        apiBaseUrl, sessionToken: authenticated.session.sessionToken, fetcher,
+      });
+      replaceEvent(updated, requestedEventId);
+      setCandidateRevision((current) => current + 1);
+      setCandidateMessage('候補日時を保存しました。');
+    } catch (error) {
+      if (error instanceof AdminApiError && expireSession(error)) return;
+      setCandidateMessage(error instanceof AdminApiError && error.code === 'EVENT_FINALIZED'
+        ? '確定日時を含む候補時間は削除できません。先に開催日時の確定を解除してください。'
+        : error instanceof AdminApiError ? error.message
+          : '候補日時を保存できませんでした。時間をおいて再度お試しください。');
+    } finally {
+      setLifecycleAction(null);
+    }
+  }
+
+  async function changeFinalization(action: 'set' | 'clear', request?: AdminFinalizationRequest) {
+    if (!authenticated || authenticated.eventId !== eventId
+      || isSaving || isChangingStatus || lifecycleAction !== null) return;
+    const requestedEventId = eventId;
+    setLifecycleAction(action === 'set' ? 'set-finalization' : 'clear-finalization');
+    setFinalizationMessage('');
+    try {
+      const options = { apiBaseUrl, sessionToken: authenticated.session.sessionToken, fetcher };
+      const updated = action === 'set' && request
+        ? await setAdminFinalization(eventId, request, options)
+        : await clearAdminFinalization(eventId, options);
+      replaceEvent(updated, requestedEventId);
+      setFinalizationMessage(action === 'set'
+        ? '開催日時を確定しました。'
+        : '開催日時の確定を解除しました。');
+    } catch (error) {
+      if (error instanceof AdminApiError && expireSession(error)) return;
+      setFinalizationMessage(error instanceof AdminApiError
+        ? error.message
+        : '開催日時を変更できませんでした。時間をおいて再度お試しください。');
+    } finally {
+      setLifecycleAction(null);
+    }
+  }
+
+  async function removeEvent() {
+    if (!authenticated || authenticated.eventId !== eventId
+      || isSaving || isChangingStatus || lifecycleAction !== null) return;
+    setLifecycleAction('delete');
+    setDeleteMessage('');
+    try {
+      await deleteAdminEvent(eventId, {
+        apiBaseUrl, sessionToken: authenticated.session.sessionToken, fetcher,
+      });
+      try { sessionStorage.removeItem(storageKey); } catch { /* no-op */ }
+      setAuthenticated(null);
+      setPageState('deleted');
+    } catch (error) {
+      if (error instanceof AdminApiError && expireSession(error)) return;
+      setDeleteMessage(error instanceof AdminApiError
+        ? error.message
+        : 'イベントを削除できませんでした。時間をおいて再度お試しください。');
+    } finally {
+      setLifecycleAction(null);
+    }
+  }
+
   if (pageState === 'checking-session'
     || (pageState === 'authenticated' && authenticated?.eventId !== eventId)) {
     return <main className="shell admin-page-state"><p>管理セッションを確認しています…</p></main>;
@@ -227,12 +325,19 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
     return <AdminLoginForm onSubmit={login} isSubmitting={isLoggingIn}
       errorMessage={loginError} requestId={loginRequestId} />;
   }
+  if (pageState === 'deleted') {
+    return <main className="shell admin-page-state admin-deleted-state">
+      <p>削除完了</p><h1>イベントを削除しました</h1>
+      <p>参加者用ページと主催者用ページは利用できなくなりました。</p>
+      <a className="event-button event-button-primary" href="./">トップへ戻る</a>
+    </main>;
+  }
   if (!authenticated || authenticated.eventId !== eventId) {
     return <main className="shell admin-page-state"><p>管理情報を読み込んでいます…</p></main>;
   }
   const event = authenticated.event;
   const url = participantUrl(eventId);
-  const isMutating = isSaving || isChangingStatus;
+  const isMutating = isSaving || isChangingStatus || lifecycleAction !== null;
 
   return <main className="admin-page">
     <div className="shell">
@@ -242,10 +347,24 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
       <div className="admin-workspace">
         <AdminEventStatusControl status={event.status}
           onClose={() => changeStatus('close')} onReopen={() => changeStatus('reopen')}
-          isChanging={isMutating} message={statusMessage} />
+          isChanging={isChangingStatus} isDisabled={isMutating} message={statusMessage} />
         <AdminResponseOverview event={event} />
         <AdminEventSettings key={`${event.id}:${settingsRevision}`} event={event} onSave={save}
-          isSaving={isMutating} saveMessage={saveMessage} fieldErrors={fieldErrors} />
+          isSaving={isSaving} isDisabled={isMutating}
+          saveMessage={saveMessage} fieldErrors={fieldErrors} />
+      </div>
+      <div className="admin-lifecycle-workspace">
+        <AdminFinalizationControl event={event} isDisabled={isMutating}
+          pendingAction={lifecycleAction === 'set-finalization' ? 'set'
+            : lifecycleAction === 'clear-finalization' ? 'clear' : null}
+          message={finalizationMessage}
+          onSet={(request) => changeFinalization('set', request)}
+          onClear={() => changeFinalization('clear')} />
+        <AdminCandidateEditor key={`${event.id}:${candidateRevision}`} event={event}
+          isMutating={isMutating} message={candidateMessage} onSave={saveCandidates} />
+        <AdminDeleteControl eventTitle={event.title} isDisabled={isMutating}
+          isDeleting={lifecycleAction === 'delete'}
+          message={deleteMessage} onDelete={removeEvent} />
       </div>
     </div>
   </main>;

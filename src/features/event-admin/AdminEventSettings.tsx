@@ -6,11 +6,12 @@ type Props = {
   event: AdminEvent;
   onSave: (request: AdminEventUpdateRequest) => void | Promise<void>;
   isSaving: boolean;
+  isDisabled?: boolean;
   saveMessage: string;
   fieldErrors?: Record<string, string[]>;
 };
 
-export function AdminEventSettings({ event, onSave, isSaving,
+export function AdminEventSettings({ event, onSave, isSaving, isDisabled = false,
   saveMessage, fieldErrors = {} }: Props) {
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description);
@@ -66,7 +67,7 @@ export function AdminEventSettings({ event, onSave, isSaving,
       </label>
       <p className="admin-operation-message" aria-live="polite">{saveMessage}</p>
       <button className="event-button event-button-primary admin-save-button" type="submit"
-        disabled={isSaving}>
+        disabled={isDisabled || isSaving}>
         {isSaving ? '保存しています…' : '変更を保存'}
       </button>
     </form>

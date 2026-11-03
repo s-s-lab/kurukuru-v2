@@ -17,7 +17,7 @@
 * { box-sizing: border-box; }
 html { min-width: 320px; background: #fff; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
-button, input, textarea { font: inherit; }
+button, input, textarea, select { font: inherit; }
 a { color: inherit; }
 
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
@@ -129,7 +129,7 @@ a { color: inherit; }
 .event-basic-form { max-width: 740px; }
 .event-field { display: grid; gap: 8px; margin-bottom: 23px; }
 .event-field label { font-size: 14px; font-weight: 700; }
-.event-field input, .event-field textarea { width: 100%; min-height: 46px; padding: 11px 13px; border: 1px solid #a8bfce; border-radius: 8px; color: var(--navy); background: #fff; }
+.event-field input, .event-field textarea, .event-field select { width: 100%; min-height: 46px; padding: 11px 13px; border: 1px solid #a8bfce; border-radius: 8px; color: var(--navy); background: #fff; }
 .event-field textarea { resize: vertical; line-height: 1.8; }
 .event-field input::placeholder, .event-field textarea::placeholder { color: #6a7f90; }
 .event-field [aria-invalid="true"] { border-color: #b12838; }
@@ -146,7 +146,7 @@ a { color: inherit; }
 .event-button-primary:hover { background: var(--teal-dark); }
 .event-button-secondary { color: var(--navy); background: #fff; border-color: #a8bfce; }
 .event-button-secondary:hover { background: var(--aqua); }
-.event-create-flow :is(button, input, textarea, [tabindex]):focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+.event-create-flow :is(button, input, textarea, select, [tabindex]):focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 .event-grid-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 14px 16px; background: var(--aqua); margin-bottom: 22px; color: var(--teal-dark); font-size: 13px; }
 .event-grid-toolbar p { margin: 0; color: var(--muted); }
 .event-grid-modes { display: flex; gap: 4px; }
@@ -432,7 +432,47 @@ a { color: inherit; }
 .admin-status-control { grid-area: status; padding: 22px 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--aqua); }
 .admin-status-control h2 { margin: 0 0 8px; font-size: 16px; }
 .admin-status-control > p:first-of-type { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
-.admin-page :is(button, input, textarea, [tabindex]):focus-visible,
+.admin-lifecycle-workspace { display: grid; grid-template-columns: minmax(280px, .75fr) minmax(0, 2fr); grid-template-areas: "finalization candidates" "delete delete"; gap: 24px 38px; align-items: start; padding-top: 54px; margin-top: 48px; border-top: 1px solid var(--line); }
+.admin-finalization, .admin-candidate-editor, .admin-delete-control { min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.admin-finalization { grid-area: finalization; padding: 26px; background: var(--aqua); }
+.admin-candidate-editor { grid-area: candidates; padding: 26px; }
+.admin-delete-control { grid-area: delete; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, .8fr); gap: 8px 38px; align-items: end; padding: 26px; border-color: #e4c4c8; }
+.admin-lifecycle-heading { display: flex; justify-content: space-between; gap: 24px; align-items: start; margin-bottom: 22px; }
+.admin-lifecycle-heading > div > p { margin: 0 0 7px; color: var(--teal-dark); font-size: 12px; font-weight: 780; letter-spacing: .08em; }
+.admin-lifecycle-heading h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
+.admin-lifecycle-heading > p { max-width: 440px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.admin-add-date { display: flex; align-items: end; gap: 12px; margin-bottom: 18px; }
+.admin-add-date .event-field { width: 220px; margin: 0; }
+.admin-candidate-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; scrollbar-color: #8da9b9 var(--aqua); }
+.admin-candidate-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.admin-candidate-table th, .admin-candidate-table td { padding: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.admin-candidate-table thead th { min-width: 49px; width: 49px; height: 40px; color: #34516f; background: var(--aqua); font-size: 11px; font-weight: 600; }
+.admin-candidate-table .admin-date-column { position: sticky; left: 0; z-index: 2; min-width: 134px; width: 134px; padding-inline: 10px; background: #fff; text-align: left; font-size: 12px; }
+.admin-candidate-table thead .admin-date-column { z-index: 3; background: var(--aqua); }
+.admin-candidate-table tr:last-child > * { border-bottom: 0; }
+.admin-candidate-table tr > :last-child { border-right: 0; }
+.admin-candidate-table .event-time-cell { height: 48px; }
+.admin-candidate-table .event-remove-date { width: 44px; height: 44px; margin-block: 2px; }
+.admin-candidate-table .event-date-column > span { display: inline-block; padding-block: 12px; }
+.admin-lifecycle-submit { min-width: 210px; }
+.admin-finalization-form { display: grid; gap: 15px; }
+.admin-finalization-form .event-field { margin: 0; }
+.admin-finalization-form .event-button, .admin-finalization-current .event-button { width: 100%; }
+.admin-finalization-current { display: grid; gap: 17px; }
+.admin-finalization-current p { margin: 0; color: #34516f; font-size: 13px; line-height: 1.7; }
+.admin-delete-control .admin-lifecycle-heading { grid-row: span 2; margin: 0; }
+.admin-delete-control .admin-lifecycle-heading > div > p, .admin-delete-control .admin-lifecycle-heading h2 { color: #8e2e38; }
+.admin-delete-control .event-field { margin: 0; }
+.admin-delete-control small { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.admin-delete-control .admin-operation-message { margin: 0; }
+.admin-delete-button { width: 100%; color: #fff; background: #a32636; }
+.admin-delete-button:not(:disabled):hover { background: #7f1f2c; }
+.admin-deleted-state { padding-block: 72px; text-align: center; }
+.admin-deleted-state > p:first-child { margin: 0 0 8px; color: var(--teal-dark); font-size: 13px; font-weight: 780; letter-spacing: .08em; }
+.admin-deleted-state h1 { margin: 0; font-size: clamp(30px, 4vw, 44px); letter-spacing: -.04em; }
+.admin-deleted-state h1 + p { margin: 18px 0 28px; color: var(--muted); }
+.admin-deleted-state .event-button { text-decoration: none; }
+.admin-page :is(button, input, textarea, select, [tabindex]):focus-visible,
 .admin-login-page :is(button, input):focus-visible { position: relative; z-index: 4; outline: 3px solid #37bbb5; outline-offset: 3px; }
 
 @media (max-width: 900px) {
@@ -440,6 +480,10 @@ a { color: inherit; }
   .admin-login-layout { grid-template-columns: minmax(0, 1fr) minmax(340px, .8fr); gap: 38px; }
   .admin-workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "status" "overview" "settings"; }
   .admin-settings { max-width: 680px; }
+  .admin-lifecycle-workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "finalization" "candidates" "delete"; }
+  .admin-finalization { max-width: 680px; }
+  .admin-delete-control { grid-template-columns: minmax(0, 1fr); }
+  .admin-delete-control .admin-lifecycle-heading { grid-row: auto; }
 }
 
 @media (max-width: 640px) {
@@ -467,4 +511,11 @@ a { color: inherit; }
   .admin-response-list-heading p { margin-top: 7px; line-height: 1.6; }
   .admin-response-list li > div { display: grid; gap: 5px; }
   .admin-settings { padding: 22px 18px; }
+  .admin-lifecycle-workspace { gap: 28px; padding-top: 38px; margin-top: 38px; }
+  .admin-finalization, .admin-candidate-editor, .admin-delete-control { padding: 22px 18px; }
+  .admin-lifecycle-heading { display: grid; gap: 12px; }
+  .admin-add-date { display: grid; }
+  .admin-add-date .event-field { width: 100%; }
+  .admin-add-date .event-button, .admin-lifecycle-submit { width: 100%; }
+  .admin-candidate-table .admin-date-column { min-width: 104px; width: 104px; padding-inline: 7px; }
 }

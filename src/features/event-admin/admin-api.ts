@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 import type {
+  AdminCandidateSlotsRequest,
   AdminEvent,
   AdminEventUpdateRequest,
+  AdminFinalizationRequest,
   AdminSessionResult,
 } from '../../../functions/admin/service';
 
@@ -119,6 +121,8 @@ const loadMessage = '管理情報を読み込めませんでした。時間を�
 const loginMessage = '管理画面を開けませんでした。入力内容を確認して再度お試しください。';
 const updateMessage = '変更を保存できませんでした。時間をおいて再度お試しください。';
 const statusMessage = '受付状態を変更できませんでした。時間をおいて再度お試しください。';
+const scheduleMessage = '日程を変更できませんでした。時間をおいて再度お試しください。';
+const deleteMessage = 'イベントを削除できませんでした。時間をおいて再度お試しください。';
 
 function authorization(sessionToken: string) {
   return { authorization: `Bearer ${sessionToken}` };
@@ -193,4 +197,74 @@ export function closeAdminEvent(eventId: string, options: AuthenticatedOptions) 
 
 export function reopenAdminEvent(eventId: string, options: AuthenticatedOptions) {
   return changeStatus(eventId, 'reopen', options);
+}
+
+export function replaceAdminCandidateSlots(
+  eventId: string,
+  request: AdminCandidateSlotsRequest,
+  options: AuthenticatedOptions,
+): Promise<AdminEvent> {
+  return requestJson(
+    adminEventSchema,
+    `${base(options.apiBaseUrl)}/events/${eventId}/candidate-slots`,
+    {
+      method: 'PUT',
+      headers: { ...authorization(options.sessionToken), 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+    options.fetcher ?? fetch,
+    scheduleMessage,
+  );
+}
+
+export function setAdminFinalization(
+  eventId: string,
+  request: AdminFinalizationRequest,
+  options: AuthenticatedOptions,
+): Promise<AdminEvent> {
+  return requestJson(
+    adminEventSchema,
+    `${base(options.apiBaseUrl)}/events/${eventId}/finalization`,
+    {
+      method: 'POST',
+      headers: { ...authorization(options.sessionToken), 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+    options.fetcher ?? fetch,
+    scheduleMessage,
+  );
+}
+
+export function clearAdminFinalization(
+  eventId: string,
+  options: AuthenticatedOptions,
+): Promise<AdminEvent> {
+  return requestJson(
+    adminEventSchema,
+    `${base(options.apiBaseUrl)}/events/${eventId}/finalization`,
+    { method: 'DELETE', headers: authorization(options.sessionToken) },
+    options.fetcher ?? fetch,
+    scheduleMessage,
+  );
+}
+
+export async function deleteAdminEvent(
+  eventId: string,
+  options: AuthenticatedOptions,
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await (options.fetcher ?? fetch)(`${base(options.apiBaseUrl)}/events/${eventId}`, {
+      method: 'DELETE', headers: authorization(options.sessionToken),
+    });
+  } catch {
+    throw new AdminApiError(0, deleteMessage);
+  }
+  if (response.status === 204) return;
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => undefined);
+    const parsed = apiErrorSchema.safeParse(body);
+    throw new AdminApiError(response.status, deleteMessage, parsed.success ? parsed.data : undefined);
+  }
+  throw new AdminApiError(response.status, deleteMessage);
 }

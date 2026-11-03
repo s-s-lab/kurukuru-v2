@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   AdminApiError,
+  clearAdminFinalization,
   closeAdminEvent,
   createAdminSession,
+  deleteAdminEvent,
   getAdminEvent,
+  replaceAdminCandidateSlots,
   reopenAdminEvent,
+  setAdminFinalization,
   updateAdminEvent,
 } from './admin-api';
 
@@ -87,6 +91,64 @@ describe('organizer admin API client', () => {
         method: 'POST', headers: { authorization: `Bearer ${token}` },
       }],
     ]);
+  });
+
+  it('replaces candidates and sets or clears the finalization with the admin bearer token', async () => {
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      calls.push([input, init]);
+      return Response.json(adminEvent);
+    };
+    const options = { apiBaseUrl: '/api/v1/', sessionToken: token, fetcher };
+    const candidates = { candidateSlots: [{ date: '2026-11-12', slotIndexes: [20, 21] }] };
+    const finalization = { date: '2026-11-12', startSlot: 20, endSlot: 22 };
+
+    await replaceAdminCandidateSlots(eventId, candidates, options);
+    await setAdminFinalization(eventId, finalization, options);
+    await clearAdminFinalization(eventId, options);
+
+    expect(calls).toEqual([
+      [`/api/v1/events/${eventId}/candidate-slots`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(candidates),
+      }],
+      [`/api/v1/events/${eventId}/finalization`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(finalization),
+      }],
+      [`/api/v1/events/${eventId}/finalization`, {
+        method: 'DELETE', headers: { authorization: `Bearer ${token}` },
+      }],
+    ]);
+  });
+
+  it('deletes an event after accepting the empty 204 response', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+
+    await expect(deleteAdminEvent(eventId, {
+      apiBaseUrl: '/api/v1', sessionToken: token, fetcher,
+    })).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledWith(`/api/v1/events/${eventId}`, {
+      method: 'DELETE', headers: { authorization: `Bearer ${token}` },
+    });
+  });
+
+  it.each([200, 202])('rejects unexpected %s success when deleting an event', async (status) => {
+    const fetcher: typeof fetch = async () => Response.json({ detail: 'private deletion detail' }, { status });
+
+    const error = await deleteAdminEvent(eventId, {
+      apiBaseUrl: '/api/v1', sessionToken: token, fetcher,
+    }).catch((value: unknown) => value);
+
+    expect(error).toBeInstanceOf(AdminApiError);
+    expect(error).toMatchObject({
+      status,
+      message: 'イベントを削除できませんでした。時間をおいて再度お試しください。',
+    });
+    expect(String(error)).not.toContain('private');
+    expect(JSON.stringify(error)).not.toContain('private');
   });
 
   it('exposes only documented API error fields', async () => {
