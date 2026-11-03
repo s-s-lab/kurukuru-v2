@@ -1,10 +1,14 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { HashRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { App } from './App';
 
 describe('Kurukuruの入口', () => {
+  beforeEach(() => {
+    window.location.hash = '#/';
+    sessionStorage.clear();
+  });
   afterEach(cleanup);
   it('サービスの価値とイベント作成導線を表示する', () => {
     render(
@@ -24,5 +28,11 @@ describe('Kurukuruの入口', () => {
     window.location.hash = '#/events/11111111-1111-4111-8111-111111111111';
     render(<HashRouter><App /></HashRouter>);
     expect(screen.getByText('イベントを読み込んでいます…')).toBeInTheDocument();
+  });
+
+  it('主催者用イベントURLのルートを持つ', async () => {
+    window.location.hash = '#/events/11111111-1111-4111-8111-111111111111/admin';
+    render(<HashRouter><App /></HashRouter>);
+    expect(await screen.findByRole('heading', { name: 'イベントを管理する' })).toBeInTheDocument();
   });
 });
