@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 
 import { BrandMark } from './components/BrandMark';
+import { AdminEventPage } from './pages/AdminEventPage';
 import { HomePage } from './pages/HomePage';
 import { NewEventPage } from './pages/NewEventPage';
 import { ParticipantEventPage } from './pages/ParticipantEventPage';
@@ -19,6 +20,9 @@ export function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/events/new" element={<NewEventPage />} />
+        <Route path="/events/:eventId/admin" element={
+          <AdminEventPage apiBaseUrl={import.meta.env.VITE_API_BASE_URL || '/api/v1'} />
+        } />
         <Route path="/events/:eventId" element={
           <ParticipantEventPage apiBaseUrl={import.meta.env.VITE_API_BASE_URL || '/api/v1'} />
         } />
