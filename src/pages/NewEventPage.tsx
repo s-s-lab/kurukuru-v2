@@ -1,7 +1,12 @@
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { EventCreateFlow } from '../features/event-create/EventCreateFlow';
+
 export function NewEventPage() {
+  const today = new Date();
+  const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
   return (
     <main className="shell form-shell">
       <Link className="back-link" to="/">
@@ -13,9 +18,7 @@ export function NewEventPage() {
         <h1>日程調整を作成</h1>
         <span>まず基本情報を入力し、次に候補日と時間帯を選びます。</span>
       </div>
-      <section className="form-panel" aria-label="イベント基本情報">
-        <p className="phase-message">イベント作成フローはP4で実装します。</p>
-      </section>
+      <EventCreateFlow today={currentDate} apiBaseUrl={import.meta.env.VITE_API_BASE_URL || '/api/v1'} location={window.location} />
     </main>
   );
 }

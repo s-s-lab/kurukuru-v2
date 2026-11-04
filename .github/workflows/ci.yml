@@ -11,6 +11,22 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kurukuru
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: kurukuru
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d kurukuru"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,7 +34,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Apply database migrations
+        run: |
+          for migration in db/migrations/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - run: npm run build:function
+      - run: npm run test:function-bundle
 
