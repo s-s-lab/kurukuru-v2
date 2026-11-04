@@ -6,6 +6,10 @@ const migrationPath = resolve(process.cwd(), 'db/migrations/0001_core_security.s
 const baseMigrationPath = resolve(process.cwd(), 'db/migrations/0000_base.sql');
 const responseVersionMigrationPath = resolve(process.cwd(), 'db/migrations/0003_response_version.sql');
 const rateLimitMigrationPath = resolve(process.cwd(), 'db/migrations/0002_request_rate_limits.sql');
+const notificationGenerationMigrationPath = resolve(
+  process.cwd(),
+  'db/migrations/0004_notification_generation.sql',
+);
 
 describe('初期DBマイグレーション', () => {
   it('回答versionを既存行に1として追加し正の整数に制限する', () => {
@@ -47,6 +51,17 @@ describe('初期DBマイグレーション', () => {
 
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS request_rate_limits');
     expect(sql).toContain('PRIMARY KEY (scope, subject_hash)');
+    expect(sql).not.toMatch(/DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)/i);
+  });
+
+  it('イベントと通知アウトボックスへ同じ通知世代を追加する', () => {
+    const sql = readFileSync(notificationGenerationMigrationPath, 'utf8');
+    expect(sql).toContain('ALTER TABLE events');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS notification_generation');
+    expect(sql).toContain('ALTER TABLE notification_outbox');
+    expect(sql).toMatch(/UPDATE events[\s\S]+notify_on_response = false/);
+    expect(sql).toMatch(/organizer_email_verified_at IS NULL/);
+    expect(sql).toMatch(/DELETE FROM notification_outbox AS n[\s\S]+status IN \('pending', 'failed'\)/);
     expect(sql).not.toMatch(/DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)/i);
   });
 });

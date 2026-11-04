@@ -9,8 +9,10 @@ import {
   getAdminEvent,
   replaceAdminCandidateSlots,
   reopenAdminEvent,
+  sendAdminEmailVerification,
   setAdminFinalization,
   updateAdminEvent,
+  verifyOrganizerEmail,
 } from './admin-api';
 
 const eventId = '11111111-1111-4111-8111-111111111111';
@@ -70,7 +72,8 @@ describe('organizer admin API client', () => {
 
     await getAdminEvent(eventId, options);
     await updateAdminEvent(eventId, {
-      title: '更新後', description: '新しい説明', notifyOnResponse: false,
+      title: '更新後', description: '新しい説明',
+      organizerEmail: 'organizer@example.com', notifyOnResponse: false,
     }, options);
     await closeAdminEvent(eventId, options);
     await reopenAdminEvent(eventId, options);
@@ -82,7 +85,10 @@ describe('organizer admin API client', () => {
       [`https://api.example.test/api/v1/events/${eventId}`, {
         method: 'PATCH',
         headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ title: '更新後', description: '新しい説明', notifyOnResponse: false }),
+        body: JSON.stringify({
+          title: '更新後', description: '新しい説明',
+          organizerEmail: 'organizer@example.com', notifyOnResponse: false,
+        }),
       }],
       [`https://api.example.test/api/v1/events/${eventId}/close`, {
         method: 'POST', headers: { authorization: `Bearer ${token}` },
@@ -135,6 +141,42 @@ describe('organizer admin API client', () => {
     });
   });
 
+  it('sends an authenticated verification email and verifies a public token', async () => {
+    const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      calls.push([input, init]);
+      return calls.length === 1
+        ? Response.json({ status: 'sent' }, { status: 202 })
+        : Response.json({ eventId, status: 'verified' });
+    };
+
+    await expect(sendAdminEmailVerification(eventId, {
+      apiBaseUrl: '/api/v1/', sessionToken: token, fetcher,
+    })).resolves.toEqual({ status: 'sent' });
+    await expect(verifyOrganizerEmail('raw/token value', {
+      apiBaseUrl: '/api/v1/', fetcher,
+    })).resolves.toEqual({ eventId, status: 'verified' });
+
+    expect(calls).toEqual([
+      [`/api/v1/events/${eventId}/email-verifications`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}` },
+      }],
+      ['/api/v1/email-verifications/raw%2Ftoken%20value', {
+        headers: { accept: 'application/json' },
+      }],
+    ]);
+  });
+
+  it('rejects malformed verification success without exposing its body', async () => {
+    const fetcher: typeof fetch = async () => Response.json({ status: 'private-unknown-state' }, { status: 202 });
+    const error = await sendAdminEmailVerification(eventId, {
+      apiBaseUrl: '/api/v1', sessionToken: token, fetcher,
+    }).catch((value: unknown) => value);
+    expect(error).toBeInstanceOf(AdminApiError);
+    expect(error).toMatchObject({ message: '確認メールを送信できませんでした。時間をおいて再度お試しください。' });
+    expect(JSON.stringify(error)).not.toContain('private-unknown-state');
+  });
+
   it.each([200, 202])('rejects unexpected %s success when deleting an event', async (status) => {
     const fetcher: typeof fetch = async () => Response.json({ detail: 'private deletion detail' }, { status });
 
@@ -161,7 +203,7 @@ describe('organizer admin API client', () => {
     }, { status: 422 });
 
     const error = await updateAdminEvent(eventId, {
-      title: '', description: '', notifyOnResponse: true,
+      title: '', description: '', organizerEmail: 'organizer@example.com', notifyOnResponse: true,
     }, { apiBaseUrl: '/api/v1', sessionToken: token, fetcher }).catch((value: unknown) => value);
 
     expect(error).toBeInstanceOf(AdminApiError);

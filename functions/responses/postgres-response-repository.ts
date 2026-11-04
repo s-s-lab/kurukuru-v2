@@ -22,6 +22,7 @@ type EventRow = {
   deleted_at: Date | null;
   notify_on_response: boolean;
   organizer_email_verified_at: Date | null;
+  notification_generation: number;
 };
 
 type ResponseRow = {
@@ -121,9 +122,10 @@ async function enqueueNotification(
     ? `response-created:${response.id}`
     : `response-updated:${response.id}:${response.version}`;
   await client.query(
-    `INSERT INTO notification_outbox (event_id, response_id, kind, idempotency_key)
-     VALUES ($1, $2, $3, $4)`,
-    [response.event_id, response.id, kind, key],
+    `INSERT INTO notification_outbox
+       (event_id, response_id, kind, idempotency_key, notification_generation)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [response.event_id, response.id, kind, key, event.notification_generation],
   );
 }
 
@@ -167,7 +169,8 @@ export class PostgresResponseRepository implements ResponseRepository {
           [key.response_body.responseId, input.eventId],
         );
         const events = await client.query<EventRow>(
-          `SELECT status, deleted_at, notify_on_response, organizer_email_verified_at
+          `SELECT status, deleted_at, notify_on_response, organizer_email_verified_at,
+                  notification_generation
            FROM events WHERE id = $1 FOR SHARE`,
           [input.eventId],
         );
@@ -181,7 +184,8 @@ export class PostgresResponseRepository implements ResponseRepository {
       }
 
       const events = await client.query<EventRow>(
-        `SELECT status, deleted_at, notify_on_response, organizer_email_verified_at
+        `SELECT status, deleted_at, notify_on_response, organizer_email_verified_at,
+                notification_generation
          FROM events WHERE id = $1 FOR SHARE`,
         [input.eventId],
       );
@@ -216,7 +220,8 @@ export class PostgresResponseRepository implements ResponseRepository {
     try {
       await client.query('BEGIN');
       const existing = await client.query<ResponseRow & EventRow>(
-        `SELECT r.*, e.status, e.deleted_at, e.notify_on_response, e.organizer_email_verified_at
+        `SELECT r.*, e.status, e.deleted_at, e.notify_on_response,
+                e.organizer_email_verified_at, e.notification_generation
          FROM responses r JOIN events e ON e.id = r.event_id
          WHERE r.id = $1 FOR UPDATE OF r, e`,
         [input.responseId],

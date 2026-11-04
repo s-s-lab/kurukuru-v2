@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 
@@ -17,6 +17,10 @@ import {
 import { IdempotencyConflictError } from './events/postgres-event-repository';
 import type { EventService } from './events/service';
 import { createEventRequestSchema } from './events/validation';
+import { EmailVerificationNotFoundError } from './email-verifications/repository';
+import type { EmailVerificationService } from './email-verifications/service';
+import { MailDeliveryError } from './mail/resend-mailer';
+import type { NotificationDispatcher } from './notifications/service';
 import {
   EventNotFoundError,
   EventClosedError,
@@ -32,6 +36,9 @@ type AppConfig = {
   eventService?: EventService;
   responseService?: ResponseService;
   adminService?: AdminService;
+  emailVerificationService?: EmailVerificationService;
+  notificationDispatcher?: NotificationDispatcher;
+  notificationWorkerSecret?: string;
   rateLimiter?: RequestRateLimiter;
 };
 
@@ -115,6 +122,14 @@ function validationFieldErrors(error: z.ZodError): Record<string, string[]> {
 
 function extractBearerToken(authorization: string | undefined): string | undefined {
   return authorization?.match(/^Bearer ([^\s]+)$/i)?.[1];
+}
+
+function secretsMatch(actual: string | undefined, expected: string): boolean {
+  if (!actual) return false;
+  const actualBytes = Buffer.from(actual);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length
+    && timingSafeEqual(actualBytes, expectedBytes);
 }
 
 export function createApp(config: AppConfig) {
@@ -417,6 +432,51 @@ export function createApp(config: AppConfig) {
     return context.json(await config.adminService.getEvent(access));
   });
 
+  app.post('/api/v1/events/:eventId/email-verifications', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const access = readAdminAccess(context);
+    const limited = await enforceAdminOperationLimits(context, access.eventId)
+      ?? await enforceRateLimit(context, {
+        scope: 'send-email-verification-global', subject: 'all', limit: 60, windowSeconds: 60,
+      })
+      ?? await enforceRateLimit(context, {
+        scope: 'send-email-verification-event', subject: access.eventId, limit: 5, windowSeconds: 600,
+      });
+    if (limited) return limited;
+    if (!config.emailVerificationService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    const result = await config.emailVerificationService.send(access);
+    return context.json(result, result.status === 'sent' ? 202 : 200);
+  });
+
+  app.get('/api/v1/email-verifications/:token', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    const token = context.req.param('token');
+    if (!token || token.length < 16 || token.length > 512) {
+      throw new EmailVerificationNotFoundError();
+    }
+    if (!config.emailVerificationService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    return context.json(await config.emailVerificationService.verify(token));
+  });
+
+  app.post('/api/v1/internal/notifications/drain', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    if (!config.notificationDispatcher || !config.notificationWorkerSecret) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    const suppliedSecret = extractBearerToken(context.req.header('authorization'));
+    if (!secretsMatch(suppliedSecret, config.notificationWorkerSecret)) {
+      return context.json({ code: 'NOT_FOUND', message: '指定されたAPIは見つかりません。', requestId }, 404);
+    }
+    return context.json(await config.notificationDispatcher.drain(10));
+  });
+
   app.patch('/api/v1/events/:eventId', async (context) => {
     preventAdminResponseCaching(context);
     const requestId = context.get('requestId');
@@ -565,6 +625,20 @@ export function createApp(config: AppConfig) {
     }
     if (error instanceof AdminAccessDeniedError) {
       return context.json({ code: 'ADMIN_ACCESS_DENIED', message: '管理画面へアクセスできません。', requestId }, 404);
+    }
+    if (error instanceof EmailVerificationNotFoundError) {
+      return context.json({
+        code: 'EMAIL_VERIFICATION_NOT_FOUND',
+        message: '確認リンクが無効か、有効期限が切れています。',
+        requestId,
+      }, 404);
+    }
+    if (error instanceof MailDeliveryError) {
+      return context.json({
+        code: 'EMAIL_DELIVERY_FAILED',
+        message: '確認メールを送信できませんでした。時間をおいて再試行してください。',
+        requestId,
+      }, 502);
     }
     if (error instanceof EventFinalizedError) {
       return context.json({

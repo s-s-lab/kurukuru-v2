@@ -203,6 +203,92 @@ describe('organizer admin page', () => {
     ]);
   });
 
+  it('shows re-verification guidance after changing the organizer email', async () => {
+    storeSession();
+    const fetcher: typeof fetch = async (input, init) => {
+      if (init?.method === 'PATCH') {
+        expect(JSON.parse(String(init.body))).toMatchObject({
+          organizerEmail: 'new-owner@example.com',
+        });
+        return Response.json({
+          ...adminEvent,
+          organizerEmail: 'new-owner@example.com',
+          organizerEmailVerified: false,
+          version: 2,
+        });
+      }
+      return Response.json(adminEvent);
+    };
+    const user = userEvent.setup();
+    renderPage(fetcher);
+    await screen.findByRole('heading', { name: adminEvent.title });
+
+    const email = screen.getByLabelText('主催者メールアドレス');
+    await user.clear(email);
+    await user.type(email, 'new-owner@example.com');
+    await user.click(screen.getByRole('button', { name: '変更を保存' }));
+
+    expect(await screen.findByText(
+      '変更を保存しました。新しいメールアドレスへ確認メールを送信してください。',
+    )).toBeInTheDocument();
+    expect(screen.getByText('未確認')).toBeInTheDocument();
+  });
+
+  it('sends an email verification from the authenticated admin page', async () => {
+    storeSession();
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith('/email-verifications')) {
+        return Response.json({ status: 'sent' }, { status: 202 });
+      }
+      return Response.json({ ...adminEvent, organizerEmailVerified: false });
+    });
+    const user = userEvent.setup();
+    renderPage(fetcher);
+    await screen.findByText('未確認');
+    await user.click(screen.getByRole('button', { name: '確認メールを送信' }));
+
+    expect(await screen.findByText('確認メールを送信しました。24時間以内にリンクを開いてください。')).toBeInTheDocument();
+    expect(fetcher).toHaveBeenCalledWith(
+      `https://api.example.test/api/v1/events/${eventId}/email-verifications`,
+      { method: 'POST', headers: { authorization: `Bearer ${token}` } },
+    );
+  });
+
+  it('clears the previous verification-send message after changing the organizer email', async () => {
+    storeSession();
+    const unverifiedEvent = { ...adminEvent, organizerEmailVerified: false };
+    const fetcher: typeof fetch = async (input, init) => {
+      if (String(input).endsWith('/email-verifications')) {
+        return Response.json({ status: 'sent' }, { status: 202 });
+      }
+      if (init?.method === 'PATCH') {
+        return Response.json({
+          ...unverifiedEvent,
+          organizerEmail: 'new-owner@example.com',
+          version: 2,
+        });
+      }
+      return Response.json(unverifiedEvent);
+    };
+    const user = userEvent.setup();
+    renderPage(fetcher);
+    await screen.findByText('未確認');
+
+    await user.click(screen.getByRole('button', { name: '確認メールを送信' }));
+    const sentMessage = '確認メールを送信しました。24時間以内にリンクを開いてください。';
+    expect(await screen.findByText(sentMessage)).toBeInTheDocument();
+
+    const email = screen.getByLabelText('主催者メールアドレス');
+    await user.clear(email);
+    await user.type(email, 'new-owner@example.com');
+    await user.click(screen.getByRole('button', { name: '変更を保存' }));
+
+    expect(await screen.findByText(
+      '変更を保存しました。新しいメールアドレスへ確認メールを送信してください。',
+    )).toBeInTheDocument();
+    expect(screen.queryByText(sentMessage)).not.toBeInTheDocument();
+  });
+
   it('adds a candidate date and saves the normalized replacement', async () => {
     storeSession();
     const requests: unknown[] = [];

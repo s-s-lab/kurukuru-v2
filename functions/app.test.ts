@@ -602,7 +602,10 @@ describe('管理コアAPI', () => {
   it('Bearer認証で管理状態取得・基本情報更新・受付停止・再開を行う', async () => {
     const adminService = adminServiceFake();
     const app = createApp({ allowedOrigins: [], adminService });
-    const update = { title: '  更新後  ', description: '  新しい説明  ', notifyOnResponse: false };
+    const update = {
+      title: '  更新後  ', description: '  新しい説明  ',
+      organizerEmail: 'ORGANIZER@example.com', notifyOnResponse: false,
+    };
 
     const found = await app.request(`/api/v1/events/${eventId}/admin`, { headers: adminHeaders() });
     const updated = await app.request(`/api/v1/events/${eventId}`, {
@@ -616,7 +619,10 @@ describe('管理コアAPI', () => {
     expect(adminService.updateEvent).toHaveBeenCalledWith({
       eventId,
       sessionToken: 'plain-admin-session-token',
-      request: { title: '更新後', description: '新しい説明', notifyOnResponse: false },
+      request: {
+        title: '更新後', description: '新しい説明',
+        organizerEmail: 'organizer@example.com', notifyOnResponse: false,
+      },
     });
     expect(adminService.closeEvent).toHaveBeenCalledWith({ eventId, sessionToken: 'plain-admin-session-token' });
     expect(adminService.reopenEvent).toHaveBeenCalledWith({ eventId, sessionToken: 'plain-admin-session-token' });
@@ -687,7 +693,10 @@ describe('管理コアAPI', () => {
       app.request(`/api/v1/events/${eventId}`, {
         method: 'PATCH',
         headers: adminHeaders(),
-        body: JSON.stringify({ title: '更新', description: '', notifyOnResponse: true }),
+        body: JSON.stringify({
+          title: '更新', description: '',
+          organizerEmail: 'organizer@example.com', notifyOnResponse: true,
+        }),
       }),
       app.request(`/api/v1/events/${eventId}/close`, { method: 'POST', headers: adminHeaders() }),
       app.request(`/api/v1/events/${eventId}/reopen`, { method: 'POST', headers: adminHeaders() }),

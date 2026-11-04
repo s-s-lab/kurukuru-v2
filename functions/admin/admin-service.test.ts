@@ -97,6 +97,7 @@ describe('admin service', () => {
     const update = {
       title: '更新後の研究会',
       description: '更新後の説明',
+      organizerEmail: 'organizer@example.com',
       notifyOnResponse: false,
     };
 

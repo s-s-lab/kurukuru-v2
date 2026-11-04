@@ -27,6 +27,7 @@ export type AdminEvent = {
 export type AdminEventUpdateRequest = {
   title: string;
   description: string;
+  organizerEmail: string;
   notifyOnResponse: boolean;
 };
 

@@ -44,16 +44,33 @@ describe('organizer event settings', () => {
     const { props } = renderSettings();
     const title = screen.getByLabelText('イベント名');
     const description = screen.getByLabelText('説明');
+    const organizerEmail = screen.getByLabelText('主催者メールアドレス');
     await user.clear(title);
     await user.type(title, '  更新後の定例  ');
     await user.clear(description);
     await user.type(description, '  新しい説明  ');
+    await user.clear(organizerEmail);
+    await user.type(organizerEmail, '  NEW-OWNER@Example.COM  ');
     await user.click(screen.getByLabelText('回答が届いたらメールで通知する'));
     await user.click(screen.getByRole('button', { name: '変更を保存' }));
 
     expect(props.onSave).toHaveBeenCalledWith({
-      title: '更新後の定例', description: '新しい説明', notifyOnResponse: false,
+      title: '更新後の定例', description: '新しい説明',
+      organizerEmail: 'new-owner@example.com', notifyOnResponse: false,
     });
+  });
+
+  it('validates the organizer email before saving', async () => {
+    const user = userEvent.setup();
+    const { props } = renderSettings();
+    const organizerEmail = screen.getByLabelText('主催者メールアドレス');
+    await user.clear(organizerEmail);
+    await user.type(organizerEmail, 'invalid-email');
+    await user.click(screen.getByRole('button', { name: '変更を保存' }));
+
+    expect(organizerEmail).toHaveAttribute('aria-invalid', 'true');
+    expect(organizerEmail).toHaveAccessibleDescription('有効なメールアドレスを入力してください。');
+    expect(props.onSave).not.toHaveBeenCalled();
   });
 
   it('disables only the settings save while it is pending', () => {

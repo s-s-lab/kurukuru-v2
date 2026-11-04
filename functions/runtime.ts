@@ -7,6 +7,11 @@ import { createResponseService } from './responses/response-service';
 import { PostgresResponseRepository } from './responses/postgres-response-repository';
 import { createEventService } from './events/event-service';
 import { PostgresEventRepository } from './events/postgres-event-repository';
+import { createEmailVerificationService } from './email-verifications/email-verification-service';
+import { PostgresEmailVerificationRepository } from './email-verifications/postgres-email-verification-repository';
+import { ResendMailer } from './mail/resend-mailer';
+import { createNotificationDispatcher } from './notifications/notification-dispatcher';
+import { PostgresNotificationRepository } from './notifications/postgres-notification-repository';
 import { PostgresRequestRateLimiter } from './security/rate-limit';
 import { generateOpaqueToken, verifyPassword } from './security/secrets';
 
@@ -14,12 +19,17 @@ type RuntimeEnvironment = {
   DATABASE_URL?: string;
   KURUKURU_TOKEN_SECRET?: string;
   KURUKURU_ALLOWED_ORIGINS?: string;
+  RESEND_API_KEY?: string;
+  KURUKURU_MAIL_FROM?: string;
+  KURUKURU_PUBLIC_BASE_URL?: string;
+  KURUKURU_NOTIFICATION_WORKER_SECRET?: string;
 };
 
 type RuntimeDependencies = {
   createPool: (connectionString: string) => Pool;
   verifyAdminPassword: (password: string, encoded: string) => Promise<boolean>;
   generateAdminToken: () => string;
+  fetcher: typeof fetch;
 };
 
 const defaultDependencies: RuntimeDependencies = {
@@ -33,6 +43,7 @@ const defaultDependencies: RuntimeDependencies = {
     }),
   verifyAdminPassword: verifyPassword,
   generateAdminToken: generateOpaqueToken,
+  fetcher: fetch,
 };
 
 export function createRuntimeApp(
@@ -70,5 +81,41 @@ export function createRuntimeApp(
     generateToken: dependencies.generateAdminToken,
   });
 
-  return createApp({ allowedOrigins, eventService, responseService, adminService, rateLimiter });
+  const hasCompleteMailConfig = Boolean(
+    environment.RESEND_API_KEY
+    && environment.KURUKURU_MAIL_FROM
+    && environment.KURUKURU_PUBLIC_BASE_URL,
+  );
+  const mailSender = hasCompleteMailConfig
+    ? new ResendMailer({
+      apiKey: environment.RESEND_API_KEY!,
+      from: environment.KURUKURU_MAIL_FROM!,
+      fetcher: dependencies.fetcher,
+    })
+    : undefined;
+  const emailVerificationService = hasCompleteMailConfig
+    ? createEmailVerificationService({
+      repository: new PostgresEmailVerificationRepository(pool),
+      mailSender: mailSender!,
+      publicBaseUrl: environment.KURUKURU_PUBLIC_BASE_URL!,
+    })
+    : undefined;
+  const notificationDispatcher = mailSender && environment.KURUKURU_NOTIFICATION_WORKER_SECRET
+    ? createNotificationDispatcher({
+      repository: new PostgresNotificationRepository(pool),
+      mailSender,
+      publicBaseUrl: environment.KURUKURU_PUBLIC_BASE_URL!,
+    })
+    : undefined;
+
+  return createApp({
+    allowedOrigins,
+    eventService,
+    responseService,
+    adminService,
+    emailVerificationService,
+    notificationDispatcher,
+    notificationWorkerSecret: environment.KURUKURU_NOTIFICATION_WORKER_SECRET,
+    rateLimiter,
+  });
 }

@@ -44,6 +44,7 @@ function replayPool(state: 'closed' | 'deleted' | 'soft-deleted' | 'hard-deleted
           status: state === 'soft-deleted' ? 'open' : state,
           deleted_at: state === 'soft-deleted' ? new Date('2026-10-30T01:00:00Z') : null,
           notify_on_response: true, organizer_email_verified_at: new Date('2026-10-30T00:00:00Z'),
+          notification_generation: 1,
         }], rowCount: state === 'hard-deleted' ? 0 : 1 };
       }
       if (/^\s*SELECT candidate_slot_id, mark FROM response_availability/.test(sql)) {
@@ -56,7 +57,59 @@ function replayPool(state: 'closed' | 'deleted' | 'soft-deleted' | 'hard-deleted
   return { async connect() { return client; } } as unknown as Pool;
 }
 
+function creationPool(queries: Array<{ sql: string; parameters?: unknown[] }>): Pool {
+  const response = {
+    id: input.responseId,
+    event_id: input.eventId,
+    display_name: input.request.displayName,
+    comment: input.request.comment,
+    edit_secret_hash: input.editTokenHash,
+    version: 1,
+    created_at: new Date('2026-11-04T00:00:00.000Z'),
+    updated_at: new Date('2026-11-04T00:00:00.000Z'),
+  };
+  const client = {
+    async query(sql: string, parameters?: unknown[]) {
+      queries.push({ sql, parameters });
+      if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql)) return { rows: [], rowCount: 0 };
+      if (/^\s*DELETE FROM idempotency_keys/.test(sql)) return { rows: [], rowCount: 0 };
+      if (/^\s*INSERT INTO idempotency_keys/.test(sql)) return { rows: [{}], rowCount: 1 };
+      if (/^\s*SELECT status, deleted_at, notify_on_response/.test(sql)) {
+        return { rows: [{
+          status: 'open', deleted_at: null, notify_on_response: true,
+          organizer_email_verified_at: new Date('2026-11-04T00:00:00.000Z'),
+          notification_generation: 7,
+        }], rowCount: 1 };
+      }
+      if (/SELECT id FROM candidate_slots/.test(sql)) {
+        return { rows: [{ id: input.request.availability[0].candidateSlotId }], rowCount: 1 };
+      }
+      if (/^\s*INSERT INTO responses/.test(sql)) return { rows: [response], rowCount: 1 };
+      if (/^\s*INSERT INTO response_availability/.test(sql)) return { rows: [], rowCount: 1 };
+      if (/^\s*INSERT INTO notification_outbox/.test(sql)) return { rows: [], rowCount: 1 };
+      if (/^\s*UPDATE idempotency_keys/.test(sql)) return { rows: [], rowCount: 1 };
+      throw new Error(`Unexpected persistence operation: ${sql}`);
+    },
+    release() { return undefined; },
+  };
+  return { async connect() { return client; } } as unknown as Pool;
+}
+
 describe('回答リポジトリの再送ライフサイクル', () => {
+  it('通知予約へ現在の通知世代を固定する', async () => {
+    const queries: Array<{ sql: string; parameters?: unknown[] }> = [];
+    await new PostgresResponseRepository(creationPool(queries)).createResponse(input);
+    const enqueue = queries.find(({ sql }) => /INSERT INTO notification_outbox/.test(sql));
+    expect(enqueue?.sql).toContain('notification_generation');
+    expect(enqueue?.parameters).toEqual([
+      input.eventId,
+      input.responseId,
+      'created',
+      `response-created:${input.responseId}`,
+      7,
+    ]);
+  });
+
   it.each(['closed', 'deleted', 'soft-deleted', 'hard-deleted'] as const)(
     '%sでは保存済みIDの再送でも現在のイベント状態を返す', async (state) => {
       const repository = new PostgresResponseRepository(replayPool(state));

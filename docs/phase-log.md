@@ -281,3 +281,96 @@ GitHubリポジトリを作成後、P3のイベント作成・回答APIをテス
 - ブラウザ到達可能なPreview環境でのPC 1440×1000・モバイル390×844の最終視覚確認
 - 主催者メール変更・メール認証・回答通知配送
 - PostgreSQL 18を使うGitHub CIでの全統合テスト
+
+## 2026-11-03 P5 主催者メール確認・回答通知
+
+### 実装内容
+
+- `kurukuru-app.jp`を公開ドメイン、`notify.kurukuru-app.jp`をResend送信サブドメインとし、`Kurukuru <no-reply@notify.kurukuru-app.jp>`からReply-Toなしで送る構成を確定
+- 管理Bearer認証付きの確認メール送信・再送APIと、24時間有効な公開確認APIを追加。生トークンを保存せずSHA-256ハッシュだけをDBへ保持し、再送時にローテーション
+- 確認済み日時をメール確認行とイベント行へ同一トランザクションで反映。同じ有効リンクの再実行を冪等化し、無効・期限切れ・削除済みを固定404へ統一
+- fetchベースのResendアダプターを追加し、Authorization、Idempotency-Key、HTML/text本文を送信。事業者の失敗本文や例外本文をAPI・DBへ保存しない
+- 回答通知アウトボックスを最大10件ずつclaimする内部APIを追加。ワーカー秘密値を定時間比較し、不一致時はAPIの存在を隠す404を返す
+- `FOR UPDATE SKIP LOCKED`で並行ワーカーを分離し、15分停滞した`sending`行を回収。1・2・4分の指数バックオフを最大6時間で上限化し、provider message IDを保存
+- 管理画面にメール確認状態、確認メール送信、通知オフ時の説明を追加。公開確認画面は確認中・完了・無効／期限切れ・一時エラーを表示し、生トークンを画面へ出さない
+- メール設定が未投入でも既存APIは起動し、メール関連ルートだけを503にする任意構成とした
+
+### 検証
+
+- メールテンプレート、Resendアダプター、確認サービス、PostgreSQL確認リポジトリ、HTTP/runtime、通知ディスパッチャー、PostgreSQL通知リポジトリ、管理UI、公開確認画面、ルーティングをテスト先行で実装
+- 全体Vitest：342件成功、52件skip（`DATABASE_URL`未設定のPostgreSQL統合7ファイル）
+- ESLintエラー・警告0、TypeScript型検査、Vite本番ビルド、Functionビルド、Functionバンドルヘルスが成功
+
+### 外部設定の残課題
+
+- Resendへ`notify.kurukuru-app.jp`を追加し、表示されたSPF/DKIM等のDNSレコードをXServer DNSへ登録してVerifiedにする
+- Neon Functionへ`RESEND_API_KEY`、`KURUKURU_MAIL_FROM`、`KURUKURU_PUBLIC_BASE_URL`、`KURUKURU_NOTIFICATION_WORKER_SECRET`を設定する
+- Neonのスケジュール機能または外部スケジューラから通知drain APIを定期呼び出しする
+- development環境で実メール確認と回答通知を疎通後、本番へ反映する
+- ブラウザ到達可能なPreview環境でPC・モバイルの最終視覚確認を行う
+
+## 2026-11-04 P5 主催者メール変更・再認証
+
+### 実装内容
+
+- 管理画面の基本情報へ主催者メールアドレス欄を追加し、trim・小文字化・メール形式検証後に既存の管理更新APIへ送信
+- 主催者メールが変わった場合、イベント行ロック下で確認済み状態を解除し、旧確認リンクと未送信・再試行待ちの回答通知を同一トランザクションで削除
+- 正規化後に同一のメールアドレスなら確認済み状態と旧確認リンクを維持し、不要な再確認を発生させない
+- 回答通知をONからOFFへ変更した場合も、未送信・再試行待ちの通知を削除
+- イベントと通知アウトボックスへ通知世代を追加。メール変更・通知OFF時に世代を進め、ワーカー取得済みの旧通知が失敗後に新しいアドレス向けとして再試行される競合を防止
+- マイグレーション時点で通知OFF・メール未確認・削除済みの既存イベントも世代を進め、旧pending/failed通知を削除。通知claim用の部分複合インデックスを追加
+- 通知ワーカーはイベントを先にロックし、主催者メール確認済み・通知ON・イベント有効・通知世代一致を再検査してからアウトボックスを取得
+- メール確認もイベント→確認トークンの順でロックし、管理更新との逆順ロックを解消
+- メール変更保存後は管理画面を未確認表示へ更新し、新しいアドレスへの確認メール送信を具体的に案内。変更前アドレス向けの送信済み案内は消去
+- `.env.example`を現在のFunction環境変数名へ更新
+
+### 検証
+
+- 全体Vitest：355件成功、55件skip（`DATABASE_URL`未設定のPostgreSQL統合8ファイル）
+- ESLintエラー・警告0、TypeScript型検査、Vite本番ビルド、Functionビルド、Functionバンドルヘルスが成功
+
+## 2026-11-04 P5 development環境反映
+
+### 反映内容
+
+- developmentブランチ`br-icy-dew-aowwun6d`の`kurukuru`データベースへ`0004_notification_generation.sql`を適用
+- `events`と`notification_outbox`の通知世代列、および通知claim用インデックス2件を確認。既存アウトボックスは0件で、不正な通知世代は0件
+- Neon Functionをdeployment 9へ更新し、主催者メール変更・再認証対応を含むAPIバンドルをdevelopment環境へ反映
+- mainブランチ`br-snowy-moon-aoktzklw`はマイグレーション未適用のまま維持
+
+### 検証
+
+- development Functionの`/api/v1/health`が`status: ok`を返すことを確認
+- development Function向けスモークテストがexit 0で完了し、DB上の既存イベント11件・回答5件・最大回答version 2を確認
+- 一時検証ブランチへ同じマイグレーションを適用し、列2件・インデックス2件・不正世代0件を確認
+- 一時検証ブランチを使うPostgreSQL統合テストは、実行環境からNeonホストを名前解決できず`EAI_AGAIN`で接続前に失敗。非DBテスト355件は成功し、SQL実行によるスキーマ検証で補完
+
+### 外部設定の残課題
+
+- XServer DNSへResend指定のDKIM・SPFレコード4件を登録。ResendでSPFのMX/TXTとCNAMEはVerified、DKIMはDNS伝播待ち
+- Resendで`notify.kurukuru-app.jp`限定の送信専用APIキーを作成し、Neon Function deployment 10へメール送信・公開URL・通知ワーカー用の環境変数を追加。既存の`KURUKURU_TOKEN_SECRET`が維持されたことを確認
+- deployment 10のHealthと、イベント作成・冪等再実行・競合・回答作成・管理認証・更新を含むスモークテストがexit 0で完了
+- DKIM認証後に実メールのエンドツーエンド検証を行う
+- 検証用一時ブランチ`test-0004-notification-generation-20261104`を承認後に削除し、mainとdevelopmentの2ブランチだけが残っていることを確認
+
+## 2026-11-04 P6 GitHub Pages公開準備
+
+### 実装内容
+
+- `kurukuru-app.jp`をルートとして配信するため、Viteの`base`を`/`へ変更
+- `main`へのpushと手動実行に対応するGitHub Pagesワークフローを追加
+- Node.js 24で依存関係を固定インストールし、Viteの`dist`だけをPages artifactとして配置
+- Webビルドへdevelopment Neon Functionの公開`/api/v1` URLを設定。秘密情報はビルド環境へ渡さない
+- Pagesのデプロイ権限を`pages: write`と`id-token: write`へ限定し、同時デプロイを直列化
+
+### 検証
+
+- 公開設定テストで、独自ドメイン用のルートパス、Pages公式Actions、artifact対象、API URLを検証
+- development API URLを指定したVite本番ビルドが成功し、生成HTMLのCSS・JavaScript参照が`/assets/`であることを確認
+
+### 外部設定の残課題
+
+- GitHub PagesをGitHub Actions公開に設定し、`kurukuru-app.jp`をカスタムドメインとして登録
+- XServer DNSへGitHub Pages用のapex A/AAAAレコードと`www` CNAMEを設定
+- Neon FunctionのCORS許可元へ`https://kurukuru-app.jp`を追加
+- HTTPS発行後、PC・モバイル表示、イベント作成、メール確認、回答通知を実環境で確認

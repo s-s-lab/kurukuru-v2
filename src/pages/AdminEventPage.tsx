@@ -15,11 +15,13 @@ import {
   getAdminEvent,
   replaceAdminCandidateSlots,
   reopenAdminEvent,
+  sendAdminEmailVerification,
   setAdminFinalization,
   updateAdminEvent,
 } from '../features/event-admin/admin-api';
 import { AdminCandidateEditor } from '../features/event-admin/AdminCandidateEditor';
 import { AdminDeleteControl } from '../features/event-admin/AdminDeleteControl';
+import { AdminEmailVerification } from '../features/event-admin/AdminEmailVerification';
 import { AdminEventHeader } from '../features/event-admin/AdminEventHeader';
 import { AdminEventSettings } from '../features/event-admin/AdminEventSettings';
 import { AdminEventStatusControl } from '../features/event-admin/AdminEventStatusControl';
@@ -77,6 +79,8 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
   const [candidateMessage, setCandidateMessage] = useState('');
   const [finalizationMessage, setFinalizationMessage] = useState('');
   const [deleteMessage, setDeleteMessage] = useState('');
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState('');
   const storageKey = adminSessionStorageKey(eventId);
 
   useEffect(() => {
@@ -176,10 +180,16 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
       const updated = await updateAdminEvent(eventId, request, {
         apiBaseUrl, sessionToken, fetcher,
       });
+      const organizerEmailChanged = updated.organizerEmail !== authenticated.event.organizerEmail;
       setAuthenticated((current) => current?.eventId === requestedEventId
         && updated.version >= current.event.version ? { ...current, event: updated } : current);
       setSettingsRevision((current) => current + 1);
-      setSaveMessage('変更を保存しました。');
+      if (organizerEmailChanged) setVerificationMessage('');
+      setSaveMessage(
+        organizerEmailChanged && !updated.organizerEmailVerified
+          ? '変更を保存しました。新しいメールアドレスへ確認メールを送信してください。'
+          : '変更を保存しました。',
+      );
     } catch (error) {
       if (error instanceof AdminApiError && expireSession(error)) return;
       setSaveMessage(error instanceof AdminApiError
@@ -317,6 +327,33 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
     }
   }
 
+  async function sendEmailVerification() {
+    if (!authenticated || authenticated.eventId !== eventId || isSaving || isChangingStatus
+      || lifecycleAction !== null || isSendingVerification) return;
+    setIsSendingVerification(true);
+    setVerificationMessage('');
+    try {
+      const result = await sendAdminEmailVerification(eventId, {
+        apiBaseUrl, sessionToken: authenticated.session.sessionToken, fetcher,
+      });
+      if (result.status === 'already-verified') {
+        setAuthenticated((current) => current?.eventId === eventId
+          ? { ...current, event: { ...current.event, organizerEmailVerified: true } }
+          : current);
+        setVerificationMessage('メールアドレスは確認済みです。');
+      } else {
+        setVerificationMessage('確認メールを送信しました。24時間以内にリンクを開いてください。');
+      }
+    } catch (error) {
+      if (error instanceof AdminApiError && expireSession(error)) return;
+      setVerificationMessage(error instanceof AdminApiError
+        ? error.message
+        : '確認メールを送信できませんでした。時間をおいて再度お試しください。');
+    } finally {
+      setIsSendingVerification(false);
+    }
+  }
+
   if (pageState === 'checking-session'
     || (pageState === 'authenticated' && authenticated?.eventId !== eventId)) {
     return <main className="shell admin-page-state"><p>管理セッションを確認しています…</p></main>;
@@ -337,7 +374,8 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
   }
   const event = authenticated.event;
   const url = participantUrl(eventId);
-  const isMutating = isSaving || isChangingStatus || lifecycleAction !== null;
+  const isMutating = isSaving || isChangingStatus || lifecycleAction !== null
+    || isSendingVerification;
 
   return <main className="admin-page">
     <div className="shell">
@@ -352,6 +390,10 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
         <AdminEventSettings key={`${event.id}:${settingsRevision}`} event={event} onSave={save}
           isSaving={isSaving} isDisabled={isMutating}
           saveMessage={saveMessage} fieldErrors={fieldErrors} />
+        <AdminEmailVerification verified={event.organizerEmailVerified}
+          notifyOnResponse={event.notifyOnResponse} isSending={isSendingVerification}
+          isDisabled={isMutating} message={verificationMessage}
+          onSend={sendEmailVerification} />
       </div>
       <div className="admin-lifecycle-workspace">
         <AdminFinalizationControl event={event} isDisabled={isMutating}

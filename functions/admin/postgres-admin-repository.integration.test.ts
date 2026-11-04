@@ -18,6 +18,63 @@ afterAll(async () => {
 });
 
 describe.skipIf(!pool)('Postgres管理リポジトリ統合', () => {
+  it('主催者メール変更で確認状態・旧リンク・未送信通知を同一トランザクションで失効する', async () => {
+    const repository = new PostgresAdminRepository(pool!);
+    const eventId = randomUUID();
+    const responseId = randomUUID();
+    const tokenHash = `admin-${randomUUID()}`;
+    try {
+      await pool!.query(
+        `INSERT INTO events
+           (id, title, description, organizer_email, admin_secret_hash,
+            organizer_email_verified_at, notify_on_response)
+         VALUES ($1, 'メール変更統合', '', 'old-owner@example.com', 'scrypt$test', now(), true)`,
+        [eventId],
+      );
+      await repository.createSession({
+        eventId,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1_000),
+      });
+      await pool!.query(
+        `INSERT INTO email_verifications (event_id, token_hash, expires_at, verified_at)
+         VALUES ($1, $2, now() + interval '1 hour', now())`,
+        [eventId, `verification-${randomUUID()}`],
+      );
+      await pool!.query(
+        `INSERT INTO responses (id, event_id, display_name, edit_secret_hash)
+         VALUES ($1, $2, '参加者', 'edit-hash')`,
+        [responseId, eventId],
+      );
+      await pool!.query(
+        `INSERT INTO notification_outbox (event_id, response_id, kind, idempotency_key)
+         VALUES ($1, $2, 'created', $3)`,
+        [eventId, responseId, `email-change-${randomUUID()}`],
+      );
+
+      const updated = await repository.updateEvent({
+        eventId,
+        tokenHash,
+        request: {
+          title: 'メール変更統合', description: '',
+          organizerEmail: 'new-owner@example.com', notifyOnResponse: true,
+        },
+      });
+
+      expect(updated).toMatchObject({
+        organizerEmail: 'new-owner@example.com', organizerEmailVerified: false, version: 2,
+      });
+      expect((await pool!.query(
+        'SELECT id FROM email_verifications WHERE event_id = $1', [eventId],
+      )).rows).toEqual([]);
+      expect((await pool!.query(
+        'SELECT id FROM notification_outbox WHERE event_id = $1', [eventId],
+      )).rows).toEqual([]);
+    } finally {
+      await pool!.query('DELETE FROM events WHERE id = $1', [eventId]);
+    }
+  });
+
   it('認証境界、更新、受付状態の冪等性を実DBで保つ', async () => {
     const repository = new PostgresAdminRepository(pool!);
     const eventId = randomUUID();
@@ -43,7 +100,10 @@ describe.skipIf(!pool)('Postgres管理リポジトリ統合', () => {
       const updated = await repository.updateEvent({
         eventId,
         tokenHash,
-        request: { title: '更新後', description: '更新説明', notifyOnResponse: false },
+        request: {
+          title: '更新後', description: '更新説明',
+          organizerEmail: 'admin@example.com', notifyOnResponse: false,
+        },
       });
       const closed = await repository.setEventStatus({ eventId, tokenHash, status: 'closed' });
       const closedAgain = await repository.setEventStatus({ eventId, tokenHash, status: 'closed' });

@@ -7,6 +7,8 @@ export const adminSessionRequestSchema = z.object({
 export const adminEventUpdateSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().max(2_000),
+  organizerEmail: z.string().trim().pipe(z.email().max(254))
+    .transform((value) => value.toLowerCase()),
   notifyOnResponse: z.boolean(),
 }).strict();
 

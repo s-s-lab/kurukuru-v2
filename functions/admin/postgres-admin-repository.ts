@@ -233,14 +233,25 @@ export class PostgresAdminRepository implements AdminRepository {
   }): Promise<AdminEvent> {
     return inTransaction(this.pool, 'BEGIN', async (client) => {
       let event = await selectAuthorizedEvent(client, input.eventId, input.tokenHash, true);
+      const organizerEmailChanged = event.organizer_email !== input.request.organizerEmail;
+      const notificationsDisabled = event.notify_on_response && !input.request.notifyOnResponse;
+      const notificationGenerationChanged = organizerEmailChanged || notificationsDisabled;
       if (
         event.title !== input.request.title
         || event.description !== input.request.description
+        || organizerEmailChanged
         || event.notify_on_response !== input.request.notifyOnResponse
       ) {
         const updated = await client.query<AdminEventRow>(
           `UPDATE events
-           SET title = $2, description = $3, notify_on_response = $4,
+           SET title = $2, description = $3, organizer_email = $4,
+               organizer_email_verified_at = CASE
+                 WHEN $6 THEN NULL ELSE organizer_email_verified_at
+               END,
+               notify_on_response = $5,
+               notification_generation = CASE
+                 WHEN $7 THEN notification_generation + 1 ELSE notification_generation
+               END,
                version = version + 1, updated_at = now()
            WHERE id = $1
            RETURNING id, title, description, organizer_email,
@@ -251,10 +262,26 @@ export class PostgresAdminRepository implements AdminRepository {
             input.eventId,
             input.request.title,
             input.request.description,
+            input.request.organizerEmail,
             input.request.notifyOnResponse,
+            organizerEmailChanged,
+            notificationGenerationChanged,
           ],
         );
         event = updated.rows[0];
+        if (organizerEmailChanged) {
+          await client.query(
+            'DELETE FROM email_verifications WHERE event_id = $1',
+            [input.eventId],
+          );
+        }
+        if (organizerEmailChanged || notificationsDisabled) {
+          await client.query(
+            `DELETE FROM notification_outbox
+             WHERE event_id = $1 AND status IN ('pending', 'failed')`,
+            [input.eventId],
+          );
+        }
       }
       return loadAdminEvent(client, event);
     });

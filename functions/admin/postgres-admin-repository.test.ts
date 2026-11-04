@@ -17,12 +17,19 @@ const removedSlotId = '55555555-5555-4555-8555-555555555555';
 const addedSlotId = '66666666-6666-4666-8666-666666666666';
 const timestamp = '2026-11-02T00:00:00.000Z';
 
-function adminPool(options: { authorized?: boolean } = {}) {
+function adminPool(options: {
+  authorized?: boolean;
+  organizerEmailVerified?: boolean;
+} = {}) {
   const queries: Array<{ sql: string; parameters?: unknown[] }> = [];
   let status: 'open' | 'closed' = 'open';
   let version = 1;
   let title = '研究会';
   let description = '説明';
+  let organizerEmail = 'organizer@example.com';
+  let organizerEmailVerifiedAt: string | null = options.organizerEmailVerified
+    ? timestamp
+    : null;
   let notifyOnResponse = true;
   let outcome: string | undefined;
   let released = false;
@@ -31,8 +38,8 @@ function adminPool(options: { authorized?: boolean } = {}) {
     id: eventId,
     title,
     description,
-    organizer_email: 'organizer@example.com',
-    organizer_email_verified_at: null,
+    organizer_email: organizerEmail,
+    organizer_email_verified_at: organizerEmailVerifiedAt,
     notify_on_response: notifyOnResponse,
     status,
     final_date: null,
@@ -51,6 +58,8 @@ function adminPool(options: { authorized?: boolean } = {}) {
         return { rows: [], rowCount: 0 };
       }
       if (/DELETE FROM admin_sessions/.test(sql)) return { rows: [], rowCount: 1 };
+      if (/DELETE FROM email_verifications/.test(sql)) return { rows: [], rowCount: 1 };
+      if (/DELETE FROM notification_outbox/.test(sql)) return { rows: [], rowCount: 2 };
       if (/INSERT INTO admin_sessions/.test(sql)) return { rows: [], rowCount: 1 };
       if (/JOIN admin_sessions/.test(sql)) {
         return { rows: options.authorized === false ? [] : [eventRow()], rowCount: options.authorized === false ? 0 : 1 };
@@ -59,7 +68,13 @@ function adminPool(options: { authorized?: boolean } = {}) {
       if (/UPDATE events\s+SET title/.test(sql)) {
         title = String(parameters?.[1]);
         description = String(parameters?.[2]);
-        notifyOnResponse = Boolean(parameters?.[3]);
+        if (/organizer_email = \$4/.test(sql)) {
+          organizerEmail = String(parameters?.[3]);
+          if (parameters?.[5]) organizerEmailVerifiedAt = null;
+          notifyOnResponse = Boolean(parameters?.[4]);
+        } else {
+          notifyOnResponse = Boolean(parameters?.[3]);
+        }
         version += 1;
         return { rows: [eventRow()], rowCount: 1 };
       }
@@ -97,7 +112,10 @@ function adminPool(options: { authorized?: boolean } = {}) {
     queries,
     outcome: () => outcome,
     released: () => released,
-    state: () => ({ status, version, title, description, notifyOnResponse }),
+    state: () => ({
+      status, version, title, description, organizerEmail,
+      organizerEmailVerified: organizerEmailVerifiedAt !== null, notifyOnResponse,
+    }),
   };
 }
 
@@ -299,11 +317,78 @@ describe('PostgresAdminRepository', () => {
     const result = await new PostgresAdminRepository(boundary.pool).updateEvent({
       eventId,
       tokenHash: 'session-hash',
-      request: { title: '更新後', description: '新しい説明', notifyOnResponse: false },
+      request: {
+        title: '更新後', description: '新しい説明',
+        organizerEmail: 'organizer@example.com', notifyOnResponse: false,
+      },
     });
 
     expect(result).toMatchObject({ title: '更新後', description: '新しい説明', notifyOnResponse: false, version: 2 });
     expect(boundary.outcome()).toBe('COMMIT');
+  });
+
+  it('changing the organizer email revokes verification, old links, and unsent notifications', async () => {
+    const boundary = adminPool({ organizerEmailVerified: true });
+    const result = await new PostgresAdminRepository(boundary.pool).updateEvent({
+      eventId,
+      tokenHash: 'session-hash',
+      request: {
+        title: '研究会', description: '説明',
+        organizerEmail: 'new-owner@example.com', notifyOnResponse: true,
+      },
+    });
+
+    expect(result).toMatchObject({
+      organizerEmail: 'new-owner@example.com', organizerEmailVerified: false, version: 2,
+    });
+    expect(boundary.queries.find(({ sql }) => /UPDATE events\s+SET title/.test(sql))?.sql)
+      .toMatch(/notification_generation = CASE/);
+    expect(boundary.queries).toContainEqual({
+      sql: expect.stringMatching(/DELETE FROM email_verifications/),
+      parameters: [eventId],
+    });
+    expect(boundary.queries.find(({ sql }) => /DELETE FROM notification_outbox/.test(sql))?.sql)
+      .toMatch(/status IN \('pending', 'failed'\)/);
+  });
+
+  it('preserves verification and pending notifications when the normalized email is unchanged', async () => {
+    const boundary = adminPool({ organizerEmailVerified: true });
+    const result = await new PostgresAdminRepository(boundary.pool).updateEvent({
+      eventId,
+      tokenHash: 'session-hash',
+      request: {
+        title: '更新後', description: '説明',
+        organizerEmail: 'organizer@example.com', notifyOnResponse: true,
+      },
+    });
+
+    expect(result).toMatchObject({ organizerEmailVerified: true });
+    expect(boundary.queries.some(({ sql }) => /DELETE FROM email_verifications/.test(sql)))
+      .toBe(false);
+    expect(boundary.queries.some(({ sql }) => /DELETE FROM notification_outbox/.test(sql)))
+      .toBe(false);
+  });
+
+  it('removes unsent notifications when response notifications are turned off', async () => {
+    const boundary = adminPool({ organizerEmailVerified: true });
+    await new PostgresAdminRepository(boundary.pool).updateEvent({
+      eventId,
+      tokenHash: 'session-hash',
+      request: {
+        title: '研究会', description: '説明',
+        organizerEmail: 'organizer@example.com', notifyOnResponse: false,
+      },
+    });
+
+    expect(boundary.queries.find(({ sql }) => /DELETE FROM notification_outbox/.test(sql)))
+      .toEqual({
+        sql: expect.stringMatching(/status IN \('pending', 'failed'\)/),
+        parameters: [eventId],
+      });
+    expect(boundary.queries.find(({ sql }) => /UPDATE events\s+SET title/.test(sql))?.sql)
+      .toMatch(/notification_generation = CASE/);
+    expect(boundary.queries.some(({ sql }) => /DELETE FROM email_verifications/.test(sql)))
+      .toBe(false);
   });
 
   it('changes lifecycle once and preserves version for an idempotent repeated command', async () => {

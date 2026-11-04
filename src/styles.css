@@ -389,7 +389,7 @@ a { color: inherit; }
 .admin-share-action .event-button { min-height: 44px; }
 .admin-share-action p { min-height: 22px; max-width: 300px; margin: 7px 0 0; color: var(--teal-dark); font-size: 12px; text-align: right; }
 
-.admin-workspace { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); grid-template-areas: "overview status" "overview settings"; gap: 22px 38px; align-items: start; padding-top: 30px; }
+.admin-workspace { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); grid-template-areas: "overview status" "overview email" "overview settings"; gap: 22px 38px; align-items: start; padding-top: 30px; }
 .admin-overview { grid-area: overview; min-width: 0; }
 .admin-section-heading { display: flex; justify-content: space-between; gap: 28px; align-items: start; margin-bottom: 20px; }
 .admin-section-heading h2, .admin-settings-heading h2 { margin: 0; font-size: 22px; letter-spacing: -.025em; }
@@ -432,6 +432,20 @@ a { color: inherit; }
 .admin-status-control { grid-area: status; padding: 22px 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--aqua); }
 .admin-status-control h2 { margin: 0 0 8px; font-size: 16px; }
 .admin-status-control > p:first-of-type { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.admin-email-verification { grid-area: email; min-width: 0; padding: 22px 26px; border: 1px solid #b8dedd; border-radius: 14px; background: #f2fbfa; }
+.admin-email-eyebrow { margin: 0 0 7px; color: var(--teal-dark); font-size: 11px; font-weight: 780; letter-spacing: .08em; }
+.admin-email-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-email-title-row h2 { margin: 0; font-size: 16px; }
+.admin-email-badge { flex: 0 0 auto; padding: 5px 8px; border-radius: 999px; color: #8e2e38; background: #fde8ea; font-size: 11px; font-weight: 780; }
+.admin-email-badge.is-verified { color: #006f60; background: #d9f7eb; }
+.admin-email-verification-copy > p:not(.admin-email-eyebrow, .admin-operation-message) { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.admin-email-note { color: #34516f !important; }
+.admin-email-verification .event-button { width: 100%; min-height: 44px; }
+.verification-page-state { flex: 1; max-width: 760px; padding-block: clamp(72px, 12vw, 140px); text-align: center; }
+.verification-kicker { margin: 0 0 10px; color: var(--teal-dark); font-size: 13px; font-weight: 780; letter-spacing: .09em; }
+.verification-page-state h1 { margin: 0; font-size: clamp(30px, 4.5vw, 46px); letter-spacing: -.04em; }
+.verification-page-state h1 + p { max-width: 620px; margin: 20px auto 30px; color: var(--muted); line-height: 1.9; }
+.verification-page-state .event-button { text-decoration: none; }
 .admin-lifecycle-workspace { display: grid; grid-template-columns: minmax(280px, .75fr) minmax(0, 2fr); grid-template-areas: "finalization candidates" "delete delete"; gap: 24px 38px; align-items: start; padding-top: 54px; margin-top: 48px; border-top: 1px solid var(--line); }
 .admin-finalization, .admin-candidate-editor, .admin-delete-control { min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
 .admin-finalization { grid-area: finalization; padding: 26px; background: var(--aqua); }
@@ -478,7 +492,7 @@ a { color: inherit; }
 @media (max-width: 900px) {
   .admin-login-page { background: #fff; }
   .admin-login-layout { grid-template-columns: minmax(0, 1fr) minmax(340px, .8fr); gap: 38px; }
-  .admin-workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "status" "overview" "settings"; }
+  .admin-workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "status" "email" "overview" "settings"; }
   .admin-settings { max-width: 680px; }
   .admin-lifecycle-workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "finalization" "candidates" "delete"; }
   .admin-finalization { max-width: 680px; }
@@ -511,6 +525,7 @@ a { color: inherit; }
   .admin-response-list-heading p { margin-top: 7px; line-height: 1.6; }
   .admin-response-list li > div { display: grid; gap: 5px; }
   .admin-settings { padding: 22px 18px; }
+  .admin-email-verification { padding: 20px 18px; }
   .admin-lifecycle-workspace { gap: 28px; padding-top: 38px; margin-top: 38px; }
   .admin-finalization, .admin-candidate-editor, .admin-delete-control { padding: 22px 18px; }
   .admin-lifecycle-heading { display: grid; gap: 12px; }

@@ -35,4 +35,10 @@ describe('Kurukuruの入口', () => {
     render(<HashRouter><App /></HashRouter>);
     expect(await screen.findByRole('heading', { name: 'イベントを管理する' })).toBeInTheDocument();
   });
+
+  it('メール確認URLのルートを持つ', () => {
+    window.location.hash = '#/email-verifications/secret-verification-token';
+    render(<HashRouter><App /></HashRouter>);
+    expect(screen.getByText('メールアドレスを確認しています…')).toBeInTheDocument();
+  });
 });

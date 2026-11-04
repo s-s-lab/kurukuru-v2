@@ -19,6 +19,7 @@
 | DELETE | `/events/:eventId` | 管理セッション | 論理削除 |
 | POST | `/events/:eventId/email-verifications` | 管理セッション・回数制限 | 認証メール送信・再送 |
 | GET | `/email-verifications/:token` | 公開・高強度トークン | 主催者メール認証 |
+| POST | `/internal/notifications/drain` | ワーカーBearer秘密値 | 回答通知を最大10件配送 |
 
 ## 共通ルール
 
@@ -78,17 +79,21 @@
 
 管理状態は公開イベントの項目に`organizerEmail`、`organizerEmailVerified`、`notifyOnResponse`、`version`を加える。管理パスワード、セッションハッシュ、メール認証トークン、配送情報は返さない。
 
-`PATCH /events/:eventId`は次の全項目を送る。タイトルと説明はtrimして保存する。主催者メールの変更はメール再認証APIと同時に後続実装する。
+`PATCH /events/:eventId`は次の全項目を送る。タイトル、説明、主催者メールはtrimし、メールは小文字へ正規化して保存する。
 
 ```json
 {
   "title": "更新後のタイトル",
   "description": "説明",
+  "organizerEmail": "organizer@example.com",
   "notifyOnResponse": true
 }
 ```
 
-- `title`：trim後1〜120文字、`description`：trim後0〜2000文字。
+- `title`：trim後1〜120文字、`description`：trim後0〜2000文字、`organizerEmail`：有効なメール形式で254文字以内。
+- 主催者メールが変わる場合は確認済み状態と旧確認リンクを失効させ、未送信・再試行待ちの回答通知を削除する。変更後は確認メールを再送するまで回答通知を作成・配送しない。
+- メールが正規化後に同一なら確認済み状態と既存確認リンクを維持する。回答通知をONからOFFへ変える場合は未送信・再試行待ちの通知を削除する。
+- 通知予約はイベントの通知世代を保持する。メール変更または通知OFFより前にワーカーが取得した通知は、送信失敗後に再試行へ戻さず破棄する。
 - close済みイベントへのclose、openイベントへのreopenは成功扱いとし、`version`と`updatedAt`を変更しない。
 - 管理APIのJSON本文上限は16KiB。入力不正は`422 VALIDATION_ERROR`、サービス未構成は`503 SERVICE_UNAVAILABLE`を返す。
 
@@ -144,3 +149,20 @@ FUNCTION_URL=https://br-icy-dew-aowwun6d-kurukuruapi.compute.c-2.ap-southeast-1.
 ```
 
 スモークは実データを作るためdevelopment専用URLを指定する。イベント作成・同一再送・異内容409、全枠bestの回答作成・同一再送、公開取得、1枠ngへのPATCH、公開取得への反映と秘密情報非公開を検証し、編集トークンはログへ出さない。作成したイベントID・回答IDだけを結果へ出す。同時実行・ロック・通知配送の検証ではない。実行結果は`docs/phase-log.md`に記録する。
+
+## 主催者メール確認・回答通知（実装済み）
+
+`POST /events/:eventId/email-verifications`は管理Bearer認証を必須とし、24時間有効の確認トークンを生成する。DBにはSHA-256ハッシュだけを保存し、再送時は既存トークンを無効化する。送信時は`202 { "status": "sent" }`、確認済みなら送信せず`200 { "status": "already-verified" }`を返す。管理操作制限に加え、全体60回/分・イベント5回/10分で制限する。
+
+`GET /email-verifications/:token`は有効な未削除イベントのトークンを確認し、`200 { "eventId": "...", "status": "verified" }`を返す。同じ有効トークンの再実行は成功する。無効・期限切れ・削除済みは`404 EMAIL_VERIFICATION_NOT_FOUND`へ統一する。両ルートは`Cache-Control: no-store`を返す。
+
+Resendは`Kurukuru <no-reply@notify.kurukuru-app.jp>`から送信し、Reply-Toは設定しない。メール設定が不足する場合、既存APIは起動したままメール関連ルートだけを`503 SERVICE_UNAVAILABLE`とする。配信事業者の失敗本文は公開せず、確認メールの配信失敗は`502 EMAIL_DELIVERY_FAILED`へ固定する。
+
+通知は回答保存トランザクションで作成済みのアウトボックスを`POST /internal/notifications/drain`が最大10件ずつ処理する。`Authorization: Bearer <KURUKURU_NOTIFICATION_WORKER_SECRET>`が一致しない場合は存在を隠す`404 NOT_FOUND`、構成不足は`503 SERVICE_UNAVAILABLE`。claimは`FOR UPDATE SKIP LOCKED`を使用し、15分以上`sending`の行を回収する。失敗は1・2・4分…の指数バックオフ（最大6時間）で再試行し、Resendへアウトボックスの冪等キーを渡す。
+
+Function環境には次を設定する（すべて`VITE_`接頭辞なし）。
+
+- `RESEND_API_KEY`
+- `KURUKURU_MAIL_FROM=Kurukuru <no-reply@notify.kurukuru-app.jp>`
+- `KURUKURU_PUBLIC_BASE_URL=https://kurukuru-app.jp`
+- `KURUKURU_NOTIFICATION_WORKER_SECRET`（強いランダム値）

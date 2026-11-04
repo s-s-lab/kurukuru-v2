@@ -54,6 +54,15 @@ const adminSessionResultSchema = z.object({
   event: adminEventSchema,
 });
 
+const emailVerificationSendResultSchema = z.object({
+  status: z.enum(['sent', 'already-verified']),
+});
+
+const emailVerificationResultSchema = z.object({
+  eventId: z.uuid(),
+  status: z.literal('verified'),
+});
+
 const apiErrorSchema = z.object({
   code: z.string(),
   message: z.string(),
@@ -123,6 +132,8 @@ const updateMessage = '変更を保存できませんでした。時間をおい
 const statusMessage = '受付状態を変更できませんでした。時間をおいて再度お試しください。';
 const scheduleMessage = '日程を変更できませんでした。時間をおいて再度お試しください。';
 const deleteMessage = 'イベントを削除できませんでした。時間をおいて再度お試しください。';
+const verificationSendMessage = '確認メールを送信できませんでした。時間をおいて再度お試しください。';
+const verificationMessage = 'メールアドレスを確認できませんでした。リンクを確認して再度お試しください。';
 
 function authorization(sessionToken: string) {
   return { authorization: `Bearer ${sessionToken}` };
@@ -245,6 +256,32 @@ export function clearAdminFinalization(
     { method: 'DELETE', headers: authorization(options.sessionToken) },
     options.fetcher ?? fetch,
     scheduleMessage,
+  );
+}
+
+export function sendAdminEmailVerification(
+  eventId: string,
+  options: AuthenticatedOptions,
+): Promise<{ status: 'sent' | 'already-verified' }> {
+  return requestJson(
+    emailVerificationSendResultSchema,
+    `${base(options.apiBaseUrl)}/events/${eventId}/email-verifications`,
+    { method: 'POST', headers: authorization(options.sessionToken) },
+    options.fetcher ?? fetch,
+    verificationSendMessage,
+  );
+}
+
+export function verifyOrganizerEmail(
+  token: string,
+  options: CommonOptions,
+): Promise<{ eventId: string; status: 'verified' }> {
+  return requestJson(
+    emailVerificationResultSchema,
+    `${base(options.apiBaseUrl)}/email-verifications/${encodeURIComponent(token)}`,
+    { headers: { accept: 'application/json' } },
+    options.fetcher ?? fetch,
+    verificationMessage,
   );
 }
 

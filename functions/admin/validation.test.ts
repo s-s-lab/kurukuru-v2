@@ -2,8 +2,34 @@ import { describe, expect, it } from 'vitest';
 
 import {
   adminCandidateSlotsSchema,
+  adminEventUpdateSchema,
   adminFinalizationSchema,
 } from './validation';
+
+describe('admin event update validation', () => {
+  it('normalizes the organizer email together with basic information', () => {
+    expect(adminEventUpdateSchema.parse({
+      title: '  更新後  ',
+      description: '  説明  ',
+      organizerEmail: 'OWNER@Example.COM',
+      notifyOnResponse: true,
+    })).toEqual({
+      title: '更新後',
+      description: '説明',
+      organizerEmail: 'owner@example.com',
+      notifyOnResponse: true,
+    });
+  });
+
+  it.each(['', 'invalid', `${'a'.repeat(250)}@example.com`])(
+    'rejects an invalid organizer email: %s',
+    (organizerEmail) => {
+      expect(adminEventUpdateSchema.safeParse({
+        title: '更新後', description: '', organizerEmail, notifyOnResponse: true,
+      }).success).toBe(false);
+    },
+  );
+});
 
 describe('admin lifecycle validation', () => {
   it('normalizes candidate days and indexes into deterministic order', () => {
