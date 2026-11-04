@@ -17,6 +17,10 @@ export function HomePage() {
           <p className="hero-lead">
             候補日ごとに時間を選び、URLを送るだけ。みんなの予定をひとつの時間軸で比べられます。
           </p>
+          <p className="hero-origin">
+            <strong>通知くるくる！</strong>
+            Kurukuruの名前は、参加者の回答があると、主催者に通知が「くる」ことから。
+          </p>
           <Link className="primary-action" to="/events/new">
             日程調整を作成
             <ArrowRight size={18} aria-hidden="true" />

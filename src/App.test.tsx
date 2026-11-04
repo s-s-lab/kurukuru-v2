@@ -18,6 +18,8 @@ describe('Kurukuruの入口', () => {
     );
 
     expect(screen.getByRole('heading', { name: '時間帯をなぞるだけ。' })).toBeInTheDocument();
+    expect(screen.getByText(/参加者の回答があると、主催者に通知が「くる」/)).toBeInTheDocument();
+    expect(screen.getByText(/通知くるくる！/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '日程調整を作成' })).toHaveAttribute(
       'href',
       '#/events/new',

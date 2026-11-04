@@ -77,6 +77,38 @@ export function EventCreateFlow({ today, apiBaseUrl, location, createEventReques
     setErrors({});
   }
 
+  function toggleDate(date: string) {
+    if (draft.candidateDays.some((candidate) => candidate.date === date)) {
+      draftChanged();
+      setDraft((previous) => ({ ...previous, candidateDays: removeCandidateDay(previous.candidateDays, date) }));
+      setErrors({});
+      return;
+    }
+    addDate(date);
+  }
+
+  function applyRange(startSlot: number, endSlot: number) {
+    const slotIndexes = Array.from({ length: endSlot - startSlot }, (_, index) => startSlot + index);
+    draftChanged();
+    setDraft((previous) => ({
+      ...previous,
+      candidateDays: previous.candidateDays.map((day) => ({
+        ...day,
+        slotIndexes: [...new Set([...day.slotIndexes, ...slotIndexes])].sort((left, right) => left - right),
+      })),
+    }));
+    setErrors({});
+  }
+
+  function clearAllSlots() {
+    draftChanged();
+    setDraft((previous) => ({
+      ...previous,
+      candidateDays: previous.candidateDays.map((day) => ({ ...day, slotIndexes: [] })),
+    }));
+    setErrors({});
+  }
+
   function toggleSlot(date: string, slot: number) {
     draftChanged();
     setDraft((previous) => ({ ...previous, candidateDays: toggleCandidateSlot(previous.candidateDays, date, slot) }));
@@ -122,7 +154,7 @@ export function EventCreateFlow({ today, apiBaseUrl, location, createEventReques
         <EventStepIndicator currentStep={step} />
         {step === 1 ? <BasicInformationStep draft={draft} errors={errors} onChange={changeField} onNext={next} /> : null}
         {step === 2 ? <CandidateTimeStep days={draft.candidateDays} currentDate={today} errors={errors}
-          onAddDate={addDate} onRemoveDate={(date) => {
+          onToggleDate={toggleDate} onApplyRange={applyRange} onClearAllSlots={clearAllSlots} onRemoveDate={(date) => {
             draftChanged();
             setDraft((previous) => ({ ...previous, candidateDays: removeCandidateDay(previous.candidateDays, date) }));
             setErrors({});

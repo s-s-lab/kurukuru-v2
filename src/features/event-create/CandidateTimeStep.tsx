@@ -1,23 +1,26 @@
 import { useRef, useState } from 'react';
-import type { FormEvent, PointerEvent } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import type { PointerEvent } from 'react';
+import { Trash2 } from 'lucide-react';
 
 import { formatSlotEnd, formatSlotStart } from '../../domain/slots';
+import { CandidateDateCalendar } from './CandidateDateCalendar';
 import type { CandidateDayDraft, FieldErrors } from './event-draft';
 
 const SLOTS = Array.from({ length: 36 }, (_, index) => index + 12);
 
 function formatDate(date: string) {
-  const [, month, day] = date.split('-');
-  return `${Number(month)}月${Number(day)}日`;
+  const [year, month, day] = date.split('-');
+  return `${year}年${Number(month)}月${Number(day)}日`;
 }
 
 type CandidateTimeStepProps = {
   days: CandidateDayDraft[];
   currentDate: string;
   errors: FieldErrors;
-  onAddDate: (date: string) => void;
+  onToggleDate: (date: string) => void;
   onRemoveDate: (date: string) => void;
+  onApplyRange: (startSlot: number, endSlot: number) => void;
+  onClearAllSlots: () => void;
   onPaintSlot: (date: string, slot: number, selected: boolean) => void;
   onToggleSlot: (date: string, slot: number) => void;
   onBack: () => void;
@@ -26,16 +29,13 @@ type CandidateTimeStepProps = {
 
 type PaintGesture = { pointerId: number; selected: boolean; visited: Set<string> };
 
-export function CandidateTimeStep({ days, currentDate, errors, onAddDate, onRemoveDate,
-  onPaintSlot, onToggleSlot, onBack, onNext }: CandidateTimeStepProps) {
-  const [date, setDate] = useState('');
+export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onRemoveDate,
+  onApplyRange, onClearAllSlots, onPaintSlot, onToggleSlot, onBack, onNext }: CandidateTimeStepProps) {
   const [interactionMode, setInteractionMode] = useState<'paint' | 'move'>('paint');
+  const [rangeStart, setRangeStart] = useState(18);
+  const [rangeEnd, setRangeEnd] = useState(24);
+  const [bulkStatus, setBulkStatus] = useState('');
   const gesture = useRef<PaintGesture | null>(null);
-
-  function addDate(event: FormEvent) {
-    event.preventDefault();
-    onAddDate(date);
-  }
 
   function paintCell(cell: HTMLElement, active: PaintGesture) {
     const cellDate = cell.dataset.date;
@@ -80,6 +80,43 @@ export function CandidateTimeStep({ days, currentDate, errors, onAddDate, onRemo
         <h2 id="candidate-heading" tabIndex={-1}>候補日時を選択してください</h2>
         <p>参加できる日と時間を、30分単位で選びます。</p>
       </div>
+      <CandidateDateCalendar days={days} currentDate={currentDate} onToggleDate={onToggleDate} />
+      {errors.date ? <p className="event-field-error candidate-calendar-error" id="candidate-date-error">{errors.date}</p> : null}
+      <section className="event-range-picker" aria-labelledby="event-range-heading">
+        <div>
+          <h3 id="event-range-heading">時間帯をまとめて選ぶ</h3>
+          <p>指定した時間帯を、選択中のすべての候補日に追加します。</p>
+        </div>
+        <div className="event-range-controls">
+          <label>開始時刻
+            <select value={rangeStart} onChange={(event) => {
+              const nextStart = Number(event.target.value);
+              setRangeStart(nextStart);
+              if (rangeEnd <= nextStart) setRangeEnd(nextStart + 1);
+            }}>
+              {SLOTS.map((slot) => <option key={slot} value={slot}>{formatSlotStart(slot)}</option>)}
+            </select>
+          </label>
+          <span aria-hidden="true">〜</span>
+          <label>終了時刻
+            <select value={rangeEnd} onChange={(event) => setRangeEnd(Number(event.target.value))}>
+              {Array.from({ length: 48 - rangeStart }, (_, index) => rangeStart + index + 1)
+                .map((boundary) => <option key={boundary} value={boundary}>{formatSlotEnd(boundary - 1)}</option>)}
+            </select>
+          </label>
+          <button type="button" className="event-button event-button-primary" disabled={days.length === 0}
+            onClick={() => {
+              onApplyRange(rangeStart, rangeEnd);
+              setBulkStatus(`${days.length}日分に${formatSlotStart(rangeStart)}〜${formatSlotEnd(rangeEnd - 1)}を追加しました。`);
+            }}>全候補日に追加</button>
+          <button type="button" className="event-button event-button-secondary" disabled={days.length === 0}
+            onClick={() => {
+              onClearAllSlots();
+              setBulkStatus('すべての候補時間を解除しました。');
+            }}>すべて解除</button>
+        </div>
+        <p className="event-range-status" role="status" aria-label="時間帯の一括操作結果" aria-live="polite">{bulkStatus}</p>
+      </section>
       <div className="event-grid-toolbar">
         <div className="event-grid-modes" role="group" aria-label="時間表の操作方法">
           <button type="button" aria-pressed={interactionMode === 'paint'} onClick={() => setInteractionMode('paint')}>塗る</button>
@@ -88,16 +125,6 @@ export function CandidateTimeStep({ days, currentDate, errors, onAddDate, onRemo
         <span>✓ 選択中</span>
         <p>クリック・ドラッグで選択。横にスクロールできます。</p>
       </div>
-      <form className="event-date-form" onSubmit={addDate} noValidate>
-        <div className="event-field">
-          <label htmlFor="candidate-date">候補日</label>
-          <input type="date" id="candidate-date" min={currentDate} value={date}
-            aria-invalid={Boolean(errors.date)} aria-describedby={errors.date ? 'candidate-date-error' : undefined}
-            onChange={(event) => setDate(event.target.value)} />
-        </div>
-        <button type="submit" className="event-button event-button-secondary"><Plus size={17} aria-hidden="true" />候補日を追加</button>
-      </form>
-      {errors.date ? <p className="event-field-error" id="candidate-date-error">{errors.date}</p> : null}
       <div className={`event-time-scroll ${interactionMode === 'paint' ? 'is-painting' : ''}`}
         onPointerDown={startPaint} onPointerMove={continuePaint} onPointerUp={endPaint}
         onPointerCancel={endPaint} onLostPointerCapture={() => { gesture.current = null; }}
