@@ -16,7 +16,7 @@ export const createEventRequestSchema = z
     title: z.string().trim().min(1).max(100),
     description: z.string().trim().max(2000).optional().default(''),
     organizerEmail: z.email().max(254),
-    adminPassword: z.string().min(8).max(128),
+    adminPassword: z.string().min(4).max(128),
     notifyOnResponse: z.boolean().optional().default(true),
     candidateSlots: z.array(candidateDaySchema).min(1).max(20),
   })

@@ -23,9 +23,7 @@ async function fillBasicInformation(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function addDate(user: ReturnType<typeof userEvent.setup>) {
-  await user.clear(screen.getByLabelText('候補日'));
-  await user.type(screen.getByLabelText('候補日'), '2026-11-10');
-  await user.click(screen.getByRole('button', { name: '候補日を追加' }));
+  await user.click(screen.getByRole('button', { name: '2026年11月10日を候補日に追加' }));
 }
 
 describe('イベント作成の基本情報と候補日時', () => {
@@ -59,7 +57,57 @@ describe('イベント作成の基本情報と候補日時', () => {
     await fillBasicInformation(user);
     expect(screen.getByRole('heading', { name: '候補日時を選択してください' })).toBeInTheDocument();
     expect(container.textContent).not.toContain('private-password');
-    expect(screen.getByLabelText('候補日')).toHaveAttribute('min', '2026-11-01');
+    expect(screen.getByRole('group', { name: '2026年11月のカレンダー' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: '2026年12月のカレンダー' })).toBeInTheDocument();
+  });
+
+  it('4文字の管理用パスワードで候補日時へ進める', async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    await user.type(screen.getByLabelText('イベント名'), '短いパスワードの確認');
+    await user.type(screen.getByLabelText('主催者メールアドレス'), 'organizer@example.com');
+    await user.type(screen.getByLabelText('管理用パスワード'), '1234');
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+    expect(screen.getByRole('heading', { name: '候補日時を選択してください' })).toBeInTheDocument();
+  });
+
+  it('カレンダーの日付クリックで即時追加し、再クリックで解除する', async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    await fillBasicInformation(user);
+    const date = screen.getByRole('button', { name: '2026年11月10日を候補日に追加' });
+    await user.click(date);
+    expect(screen.getByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' })).toBeInTheDocument();
+    expect(date).toHaveAccessibleName('2026年11月10日を候補日から削除');
+    expect(date).toHaveAttribute('aria-pressed', 'true');
+    await user.click(date);
+    expect(screen.queryByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' })).not.toBeInTheDocument();
+    expect(date).toHaveAccessibleName('2026年11月10日を候補日に追加');
+  });
+
+  it('カレンダーは1つの日付だけをTab対象にし、矢印キーで日付間を移動する', async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    await fillBasicInformation(user);
+    const first = screen.getByRole('button', { name: '2026年11月1日を候補日に追加' });
+    const next = screen.getByRole('button', { name: '2026年11月2日を候補日に追加' });
+    expect(first).toHaveAttribute('tabindex', '0');
+    expect(next).toHaveAttribute('tabindex', '-1');
+    first.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(next).toHaveFocus();
+    expect(first).toHaveAttribute('tabindex', '-1');
+    expect(next).toHaveAttribute('tabindex', '0');
+  });
+
+  it('年をまたぐ候補日を時間表で区別できる', async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    await fillBasicInformation(user);
+    await user.click(screen.getByRole('button', { name: '次の月へ' }));
+    await user.click(screen.getByRole('button', { name: '2027年1月10日を候補日に追加' }));
+    expect(screen.getByRole('button', { name: '2027年1月10日 09:00〜09:30 選択' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2027年1月10日を削除' })).toBeInTheDocument();
   });
 
   it('候補日は1行だけ追加し、36個の時間をクリックとキーボードで選択できる', async () => {
@@ -71,9 +119,9 @@ describe('イベント作成の基本情報と候補日時', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(2);
     const cells = within(table).getAllByRole('button', { name: /選択$/ });
     expect(cells).toHaveLength(36);
-    expect(cells[0]).toHaveAccessibleName('11月10日 06:00〜06:30 選択');
-    expect(cells[35]).toHaveAccessibleName('11月10日 23:30〜24:00 選択');
-    const slot = screen.getByRole('button', { name: '11月10日 09:00〜09:30 選択' });
+    expect(cells[0]).toHaveAccessibleName('2026年11月10日 06:00〜06:30 選択');
+    expect(cells[35]).toHaveAccessibleName('2026年11月10日 23:30〜24:00 選択');
+    const slot = screen.getByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' });
     await user.click(slot);
     expect(slot).toHaveAttribute('aria-pressed', 'true');
     slot.focus();
@@ -81,9 +129,30 @@ describe('イベント作成の基本情報と候補日時', () => {
     expect(slot).toHaveAttribute('aria-pressed', 'false');
     await user.keyboard('{Enter}');
     expect(slot).toHaveAttribute('aria-pressed', 'true');
-    await addDate(user);
-    expect(screen.getByText('同じ候補日を重複して指定できません。')).toBeInTheDocument();
     expect(within(table).getAllByRole('row')).toHaveLength(2);
+  });
+
+  it('指定した時間帯をすべての候補日に一括追加し、まとめて解除できる', async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    await fillBasicInformation(user);
+    await addDate(user);
+    await user.click(screen.getByRole('button', { name: '2026年11月12日を候補日に追加' }));
+    await user.selectOptions(screen.getByLabelText('開始時刻'), '18');
+    await user.selectOptions(screen.getByLabelText('終了時刻'), '22');
+    await user.click(screen.getByRole('button', { name: '全候補日に追加' }));
+    expect(screen.getByRole('status', { name: '時間帯の一括操作結果' }))
+      .toHaveTextContent('2日分に09:00〜11:00を追加しました。');
+    for (const date of ['2026年11月10日', '2026年11月12日']) {
+      expect(screen.getByRole('button', { name: `${date} 09:00〜09:30 選択` })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: `${date} 10:30〜11:00 選択` })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: `${date} 11:00〜11:30 選択` })).toHaveAttribute('aria-pressed', 'false');
+    }
+    await user.click(screen.getByRole('button', { name: 'すべて解除' }));
+    expect(screen.getByRole('status', { name: '時間帯の一括操作結果' }))
+      .toHaveTextContent('すべての候補時間を解除しました。');
+    expect(screen.getByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '2026年11月12日 10:30〜11:00 選択' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('ドラッグで通過した時間を同じ選択状態に塗り、次のクリックでも選択を解除できる', async () => {
@@ -91,8 +160,8 @@ describe('イベント作成の基本情報と候補日時', () => {
     renderFlow();
     await fillBasicInformation(user);
     await addDate(user);
-    const first = screen.getByRole('button', { name: '11月10日 09:00〜09:30 選択' });
-    const next = screen.getByRole('button', { name: '11月10日 09:30〜10:00 選択' });
+    const first = screen.getByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' });
+    const next = screen.getByRole('button', { name: '2026年11月10日 09:30〜10:00 選択' });
     await user.pointer([
       { keys: '[MouseLeft>]', target: first },
       { target: next },
@@ -113,8 +182,8 @@ describe('イベント作成の基本情報と候補日時', () => {
     await addDate(user);
     await user.click(screen.getByRole('button', { name: '次へ' }));
     expect(screen.getByText('各候補日に時間を1つ以上選択してください。')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '11月10日を削除' }));
-    expect(screen.queryByRole('button', { name: '11月10日 09:00〜09:30 選択' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '2026年11月10日を削除' }));
+    expect(screen.queryByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' })).not.toBeInTheDocument();
   });
 
   it('戻る操作で全基本項目と候補時間を保持する', async () => {
@@ -122,7 +191,7 @@ describe('イベント作成の基本情報と候補日時', () => {
     renderFlow();
     await fillBasicInformation(user);
     await addDate(user);
-    await user.click(screen.getByRole('button', { name: '11月10日 09:00〜09:30 選択' }));
+    await user.click(screen.getByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' }));
     await user.click(screen.getByRole('button', { name: '戻る' }));
     expect(screen.getByLabelText('イベント名')).toHaveValue('11月の定例ミーティング');
     expect(screen.getByLabelText('説明（任意）')).toHaveValue('みんなで予定を合わせます。');
@@ -131,7 +200,7 @@ describe('イベント作成の基本情報と候補日時', () => {
     expect(screen.getByLabelText('管理用パスワード')).toHaveAttribute('type', 'password');
     expect(screen.getByLabelText('回答時にメールで通知')).not.toBeChecked();
     await user.click(screen.getByRole('button', { name: '次へ' }));
-    expect(screen.getByRole('button', { name: '11月10日 09:00〜09:30 選択' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' })).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
@@ -148,7 +217,7 @@ async function reachConfirmation(user: ReturnType<typeof userEvent.setup>) {
   await fillBasicInformation(user);
   await addDate(user);
   for (const time of ['09:00〜09:30', '09:30〜10:00', '10:00〜10:30', '23:30〜24:00']) {
-    await user.click(screen.getByRole('button', { name: `11月10日 ${time} 選択` }));
+    await user.click(screen.getByRole('button', { name: `2026年11月10日 ${time} 選択` }));
   }
   await user.click(screen.getByRole('button', { name: '次へ' }));
 }
@@ -165,7 +234,7 @@ describe('イベント作成の確認・送信・共有', () => {
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: '基本情報を入力してください' }));
     await user.click(screen.getByRole('button', { name: '次へ' }));
     await addDate(user);
-    await user.click(screen.getByRole('button', { name: '11月10日 09:00〜09:30 選択' }));
+    await user.click(screen.getByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' }));
     await user.click(screen.getByRole('button', { name: '次へ' }));
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: '内容を確認してください' }));
     await user.click(screen.getByRole('button', { name: '戻る' }));
@@ -198,7 +267,7 @@ describe('イベント作成の確認・送信・共有', () => {
     expect(screen.queryByRole('heading', { name: '日程調整を作成しました' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '戻る' }));
     for (const time of ['09:00〜09:30', '09:30〜10:00', '10:00〜10:30', '23:30〜24:00']) {
-      expect(screen.getByRole('button', { name: `11月10日 ${time} 選択` })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: `2026年11月10日 ${time} 選択` })).toHaveAttribute('aria-pressed', 'true');
     }
     await user.click(screen.getByRole('button', { name: '戻る' }));
     expect(screen.getByLabelText('イベント名')).toHaveValue('11月の定例ミーティング');
@@ -231,7 +300,7 @@ describe('イベント作成の確認・送信・共有', () => {
     expect(screen.queryByLabelText('管理用パスワード')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '戻る' }));
     for (const time of ['09:00〜09:30', '09:30〜10:00', '10:00〜10:30', '23:30〜24:00']) {
-      expect(screen.getByRole('button', { name: `11月10日 ${time} 選択` })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: `2026年11月10日 ${time} 選択` })).toHaveAttribute('aria-pressed', 'true');
     }
   });
 
@@ -250,8 +319,8 @@ describe('イベント作成の確認・送信・共有', () => {
     await user.type(screen.getByLabelText('主催者メールアドレス'), 'Organizer@Example.COM');
     await user.click(screen.getByRole('button', { name: '次へ' }));
     await addDate(user);
-    await user.click(screen.getByRole('button', { name: '11月10日 10:00〜10:30 選択' }));
-    await user.click(screen.getByRole('button', { name: '11月10日 09:00〜09:30 選択' }));
+    await user.click(screen.getByRole('button', { name: '2026年11月10日 10:00〜10:30 選択' }));
+    await user.click(screen.getByRole('button', { name: '2026年11月10日 09:00〜09:30 選択' }));
     await user.click(screen.getByRole('button', { name: '次へ' }));
     const submit = screen.getByRole('button', { name: '日程調整を作成' });
     await user.dblClick(submit);
@@ -300,7 +369,7 @@ describe('イベント作成の確認・送信・共有', () => {
       await user.type(screen.getByLabelText('イベント名'), '（更新）');
       await user.click(screen.getByRole('button', { name: '次へ' }));
     } else {
-      await user.click(screen.getByRole('button', { name: '11月10日 11:00〜11:30 選択' }));
+      await user.click(screen.getByRole('button', { name: '2026年11月10日 11:00〜11:30 選択' }));
     }
     await user.click(screen.getByRole('button', { name: '次へ' }));
     await user.click(screen.getByRole('button', { name: '日程調整を作成' }));

@@ -124,6 +124,22 @@ describe('Neon Functions API', () => {
     expect(eventService.createCalls).toHaveLength(1);
   });
 
+  it('4文字の管理用パスワードでイベントを作成できる', async () => {
+    const eventService = createEventServiceFake();
+    const app = createApp({ allowedOrigins: [], eventService });
+    const response = await app.request('/api/v1/events', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': 'four-character-password',
+      },
+      body: JSON.stringify({ ...validEventRequest, adminPassword: '1234' }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(eventService.createCalls).toHaveLength(1);
+  });
+
   it('冪等キーがないイベント作成を400で拒否する', async () => {
     const eventService = createEventServiceFake();
     const app = createApp({ allowedOrigins: [], eventService });
@@ -150,7 +166,7 @@ describe('Neon Functions API', () => {
       body: JSON.stringify({
         ...validEventRequest,
         title: '',
-        adminPassword: 'short',
+        adminPassword: '123',
         candidateSlots: [{ date: 'not-a-date', slotIndexes: [11, 48] }],
       }),
     });

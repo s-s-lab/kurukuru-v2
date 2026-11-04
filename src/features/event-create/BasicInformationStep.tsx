@@ -47,11 +47,11 @@ export function BasicInformationStep({ draft, errors, onChange, onNext }: BasicI
       <div className="event-field">
         <label htmlFor="event-password">管理用パスワード</label>
         <input id="event-password" type="password" autoComplete="new-password" value={draft.adminPassword} required
-          minLength={8} maxLength={128} aria-invalid={Boolean(errors.adminPassword)}
+          minLength={4} maxLength={128} aria-invalid={Boolean(errors.adminPassword)}
           aria-describedby={errors.adminPassword ? 'event-password-error' : 'event-password-help'}
           onChange={(event) => onChange('adminPassword', event.target.value)} />
         {errors.adminPassword ? <p className="event-field-error" id="event-password-error">{errors.adminPassword}</p>
-          : <p className="event-field-help" id="event-password-help">8文字以上。主催者用ページで使用します。</p>}
+          : <p className="event-field-help" id="event-password-help">4文字以上。主催者用ページで使用します。</p>}
       </div>
       <label className="event-checkbox">
         <input type="checkbox" checked={draft.notifyOnResponse}

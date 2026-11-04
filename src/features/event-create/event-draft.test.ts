@@ -47,11 +47,12 @@ describe('event creation draft', () => {
     });
   });
 
-  it('rejects passwords shorter than eight characters without trimming them', () => {
-    expect(validateBasicInformation({ ...draft, adminPassword: '1234567' })).toEqual({
-      adminPassword: '管理用パスワードは8文字以上128文字以下で入力してください。',
+  it('accepts four-character passwords and rejects shorter values without trimming them', () => {
+    expect(validateBasicInformation({ ...draft, adminPassword: '1234' })).toEqual({});
+    expect(validateBasicInformation({ ...draft, adminPassword: '123' })).toEqual({
+      adminPassword: '管理用パスワードは4文字以上128文字以下で入力してください。',
     });
-    expect(validateBasicInformation({ ...draft, adminPassword: ' pass   ' })).toEqual({});
+    expect(validateBasicInformation({ ...draft, adminPassword: '    ' })).toEqual({});
   });
 
   it.each([

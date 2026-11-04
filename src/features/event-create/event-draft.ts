@@ -39,8 +39,8 @@ export function validateBasicInformation(draft: EventDraft): FieldErrors {
   if (email.length > 254 || !z.email().safeParse(email).success) {
     errors.organizerEmail = '有効なメールアドレスを入力してください。';
   }
-  if (draft.adminPassword.length < 8 || draft.adminPassword.length > 128) {
-    errors.adminPassword = '管理用パスワードは8文字以上128文字以下で入力してください。';
+  if (draft.adminPassword.length < 4 || draft.adminPassword.length > 128) {
+    errors.adminPassword = '管理用パスワードは4文字以上128文字以下で入力してください。';
   }
   return errors;
 }
