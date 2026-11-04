@@ -75,6 +75,7 @@ describe('Postgres通知リポジトリ', () => {
     const call = vi.mocked(client.query).mock.calls.find(([sql]) => /SET status = 'failed'/.test(String(sql)))!;
     expect(eventLockIndex).toBeGreaterThan(-1);
     expect(failureIndex).toBeGreaterThan(eventLockIndex);
+    expect(String(call[0])).toContain('next_attempt_at = $3::timestamptz + LEAST(');
     expect(String(call[0])).toContain("power(2, GREATEST(attempts - 1, 0)) * interval '1 minute'");
     expect(String(call[0])).toContain("interval '6 hours'");
     expect(String(call[0])).toContain('notification_generation = $4');

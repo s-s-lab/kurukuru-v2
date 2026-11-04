@@ -152,7 +152,7 @@ export class PostgresNotificationRepository implements NotificationRepository {
       await client.query(
         `UPDATE notification_outbox AS n
             SET status = 'failed', error_message = $2,
-                next_attempt_at = $3 + LEAST(
+                next_attempt_at = $3::timestamptz + LEAST(
                   power(2, GREATEST(attempts - 1, 0)) * interval '1 minute',
                   interval '6 hours'
                 ),
