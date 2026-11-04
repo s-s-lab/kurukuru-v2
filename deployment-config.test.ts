@@ -20,4 +20,10 @@ describe('GitHub Pages deployment configuration', () => {
       'VITE_API_BASE_URL: https://br-icy-dew-aowwun6d-kurukuruapi.compute.c-2.ap-southeast-1.aws.neon.tech/api/v1',
     );
   });
+
+  it('documents the custom domain as an allowed browser origin', () => {
+    const exampleEnvironment = readFileSync('.env.example', 'utf8');
+
+    expect(exampleEnvironment).toContain('KURUKURU_ALLOWED_ORIGINS=https://kurukuru-app.jp');
+  });
 });
