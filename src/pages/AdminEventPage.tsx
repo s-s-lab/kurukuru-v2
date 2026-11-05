@@ -20,7 +20,7 @@ import {
 } from '../features/event-admin/admin-session';
 import type { CandidateDayDraft } from '../features/event-create/event-draft';
 
-type Props = { apiBaseUrl: string; fetcher?: typeof fetch };
+type Props = { apiBaseUrl: string; fetcher?: typeof fetch; today?: string };
 type PageState = 'checking-session' | 'login' | 'authenticated';
 type AuthenticatedState = { eventId: string; event: AdminEvent; session: StoredAdminSession };
 
@@ -31,7 +31,7 @@ export function AdminEventPage(props: Props) {
   const { eventId = '' } = useParams();
   return <AdminEventPageState key={eventId} eventId={eventId} {...props} />;
 }
-function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId: string }) {
+function AdminEventPageState({ apiBaseUrl, fetcher, eventId, today = new Date().toISOString().slice(0, 10) }: Props & { eventId: string }) {
   const [pageState, setPageState] = useState<PageState>('checking-session');
   const [authenticated, setAuthenticated] = useState<AuthenticatedState | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -163,7 +163,7 @@ function AdminEventPageState({ apiBaseUrl, fetcher, eventId }: Props & { eventId
         </a>
       </header>
       <AdminCandidateEditor key={`${event.id}:${candidateRevision}`} event={event}
-        isMutating={isSaving} message={candidateMessage} onSave={saveCandidates} />
+        isMutating={isSaving} message={candidateMessage} currentDate={today} onSave={saveCandidates} />
     </div>
   </main>;
 }

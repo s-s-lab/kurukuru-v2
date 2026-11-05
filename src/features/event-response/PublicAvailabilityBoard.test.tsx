@@ -24,14 +24,18 @@ const event: PublicEvent = {
 
 describe('公開回答ボード', () => {
   afterEach(cleanup);
-  it('回答者を行、候補時間を列として全回答とコメントを公開表示する', () => {
+  it('候補日ごとの06時から24時の表に回答者の回答と非候補時間を表示する', () => {
     render(<PublicAvailabilityBoard event={event} />);
-    const table = screen.getByRole('table', { name: 'みんなの回答' });
-    const rows = within(table).getAllByRole('row');
-    expect(rows).toHaveLength(3);
-    expect(within(rows[1]).getByRole('rowheader')).toHaveTextContent('鈴木');
-    expect(within(rows[1]).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['◎', '○', '×']);
-    expect(within(rows[2]).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['△', '○', '◎']);
+    const firstDate = screen.getByRole('table', { name: '2026年11月10日のみんなの回答' });
+    const secondDate = screen.getByRole('table', { name: '2026年11月12日のみんなの回答' });
+    const firstRows = within(firstDate).getAllByRole('row');
+    const secondRows = within(secondDate).getAllByRole('row');
+    expect(within(firstRows[1]).getByRole('rowheader')).toHaveTextContent('鈴木');
+    expect(firstRows[1].querySelectorAll('td')).toHaveLength(36);
+    expect(firstRows[1].querySelectorAll('td')[6]).toHaveTextContent('◎');
+    expect(firstRows[1].querySelectorAll('td')[7]).toHaveTextContent('○');
+    expect(secondRows[2].querySelectorAll('td')[8]).toHaveTextContent('◎');
+    expect(firstDate.querySelectorAll('.public-board-slot-blocked').length).toBeGreaterThan(0);
     expect(screen.getByText('午前中を希望します')).toBeInTheDocument();
     expect(screen.getByText('調整中です')).toBeInTheDocument();
     expect(screen.queryByLabelText(/回答人数/)).not.toBeInTheDocument();
@@ -40,6 +44,6 @@ describe('公開回答ボード', () => {
   it('回答がない場合も候補日時を表示して参加を促す', () => {
     render(<PublicAvailabilityBoard event={{ ...event, responses: [] }} />);
     expect(screen.getByText('まだ回答はありません。最初の回答を追加してください。')).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'みんなの回答' })).toBeInTheDocument();
+    expect(screen.getAllByRole('table')).toHaveLength(2);
   });
 });

@@ -5,7 +5,7 @@ import { Hand, Pencil } from 'lucide-react';
 import type { AvailabilityMark, PublicEvent } from '../../../functions/events/service';
 import { MARKS, type AvailabilityMap } from '../../domain/availability';
 import { formatSlotEnd, formatSlotStart } from '../../domain/slots';
-import { buildGridModel } from './response-model';
+import { DAY_SLOT_INDEXES, formatTimelineHeader, uniqueCandidateDates } from '../../domain/timeline';
 
 type Props = {
   event: PublicEvent;
@@ -20,15 +20,21 @@ const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
 function formatDate(date: string) {
   const value = new Date(`${date}T00:00:00`);
-  const [, month, day] = date.split('-');
-  return `${Number(month)}月${Number(day)}日（${weekdays[value.getDay()]}）`;
+  const [year, month, day] = date.split('-');
+  return `${year}年${Number(month)}月${Number(day)}日（${weekdays[value.getDay()]}）`;
+}
+
+function tableLabel(date: string) {
+  const [year, month, day] = date.split('-');
+  return `${year}年${Number(month)}月${Number(day)}日の回答時間表`;
 }
 
 export function AvailabilityResponseGrid({ event, availability, selectedMark,
   onSelectedMarkChange, onPaint }: Props) {
   const [mode, setMode] = useState<'paint' | 'move'>('paint');
   const gesture = useRef<Gesture | null>(null);
-  const grid = buildGridModel(event);
+  const dates = uniqueCandidateDates(event.candidateSlots);
+  const slotIds = new Map(event.candidateSlots.map((slot) => [`${slot.date}:${slot.slotIndex}`, slot.id]));
 
   function paintCell(cell: HTMLElement, active: Gesture) {
     const slotId = cell.dataset.slotId;
@@ -60,9 +66,7 @@ export function AvailabilityResponseGrid({ event, availability, selectedMark,
   function endPaint(event_: PointerEvent<HTMLDivElement>) {
     if (gesture.current?.pointerId !== event_.pointerId) return;
     gesture.current = null;
-    if (event_.currentTarget.hasPointerCapture?.(event_.pointerId)) {
-      event_.currentTarget.releasePointerCapture(event_.pointerId);
-    }
+    if (event_.currentTarget.hasPointerCapture?.(event_.pointerId)) event_.currentTarget.releasePointerCapture(event_.pointerId);
   }
 
   return <section className="response-grid-section" aria-labelledby="response-grid-heading">
@@ -70,7 +74,6 @@ export function AvailabilityResponseGrid({ event, availability, selectedMark,
       <h2 id="response-grid-heading">回答を選んで、時間帯を塗ってください</h2>
       <p>候補時間は初期状態で「不可」です。参加できる時間を塗り替えてください。</p>
     </div>
-
     <div className="response-grid-controls">
       <div className="response-mark-picker" role="group" aria-label="回答の種類">
         {MARKS.map((mark) => <button type="button" key={mark.value}
@@ -89,31 +92,34 @@ export function AvailabilityResponseGrid({ event, availability, selectedMark,
         </button>
       </div>
     </div>
-
     <div className={`response-grid-scroll ${mode === 'paint' ? 'is-painting' : ''}`}
       role="region" aria-label="回答時間表" tabIndex={0}
       onPointerDown={startPaint} onPointerMove={continuePaint} onPointerUp={endPaint}
       onPointerCancel={endPaint} onLostPointerCapture={() => { gesture.current = null; }}>
-      <table className="response-time-table" aria-label="回答する時間表">
-        <thead><tr><th className="response-date-column" scope="col">候補日</th>
-          {grid.slotIndexes.map((slot) => <th scope="col" key={slot}>{formatSlotStart(slot)}</th>)}
-        </tr></thead>
-        <tbody>{grid.dates.map((date) => <tr key={date}>
-          <th className="response-date-column" scope="row">{formatDate(date)}</th>
-          {grid.slotIndexes.map((slot) => {
-            const slotId = grid.slotIds[`${date}:${slot}`];
-            if (!slotId) return <td key={slot} className="response-slot-blocked" aria-hidden="true" />;
-            const mark = MARKS.find(({ value }) => value === availability[slotId]) ?? MARKS[3];
-            return <td key={slot}><button type="button" data-slot-id={slotId}
-              className={`response-slot response-slot-${mark.value}`}
-              aria-label={`${formatDate(date)} ${formatSlotStart(slot)}〜${formatSlotEnd(slot)} ${mark.label}`}
-              onClick={(clickEvent) => {
-                if (clickEvent.detail === 0 || mode === 'move') onPaint([slotId], selectedMark);
-              }}><span aria-hidden="true">{mark.symbol}</span></button></td>;
-          })}
-        </tr>)}</tbody>
-      </table>
+      <div className="timeline-date-groups">
+        {dates.map((date) => <div className="timeline-date-group" key={date}>
+          <div className="timeline-scroll">
+            <table className="response-time-table timeline-table" aria-label={tableLabel(date)}>
+              <thead><tr><th className="response-date-column timeline-sticky-column" scope="col">{formatDate(date)}</th>
+                {DAY_SLOT_INDEXES.map((slot) => <th scope="col" key={slot}>{formatTimelineHeader(slot)}</th>)}
+              </tr></thead>
+              <tbody><tr><th className="response-date-column timeline-sticky-column" scope="row">あなた</th>
+                {DAY_SLOT_INDEXES.map((slot) => {
+                  const slotId = slotIds.get(`${date}:${slot}`);
+                  if (!slotId) return <td key={slot} className="response-slot-blocked" aria-hidden="true" />;
+                  const mark = MARKS.find(({ value }) => value === availability[slotId]) ?? MARKS[3];
+                  return <td key={slot}><button type="button" data-slot-id={slotId}
+                    className={`response-slot response-slot-${mark.value}`}
+                    aria-label={`${formatDate(date)} ${formatSlotStart(slot)}〜${formatSlotEnd(slot)} ${mark.label}`}
+                    onClick={(clickEvent) => {
+                      if (clickEvent.detail === 0 || mode === 'move') onPaint([slotId], selectedMark);
+                    }}><span aria-hidden="true">{mark.symbol}</span></button></td>;
+                })}
+              </tr></tbody>
+            </table>
+          </div>
+        </div>)}
+      </div>
     </div>
-
   </section>;
 }

@@ -680,3 +680,189 @@ a { color: inherit; }
   .admin-add-date .event-button, .admin-lifecycle-submit { width: 100%; }
   .admin-candidate-table .admin-date-column { min-width: 104px; width: 104px; padding-inline: 7px; }
 }
+
+/* Dense information layout shared by all current screens. */
+.shell { width: min(1440px, calc(100% - 32px)); }
+.header-inner { min-height: 54px; }
+.brand-mark { gap: 8px; font-size: 21px; }
+.brand-icon { width: 30px; height: 30px; border-radius: 8px; }
+.site-footer .shell { padding-block: 12px; }
+.form-shell { padding-block: 20px 32px; }
+.page-heading { margin-block: 16px 14px; }
+.page-heading h1 { font-size: 30px; }
+.page-heading span { margin-top: 5px; font-size: 13px; }
+.event-create-single-form { padding-top: 12px; }
+.event-create-upper { grid-template-columns: minmax(290px, 360px) minmax(0, 1fr); gap: 12px 18px; }
+.event-step-heading { margin-bottom: 12px; }
+.event-step-heading h2 { margin-bottom: 4px; font-size: 20px; }
+.event-step-heading p { line-height: 1.5; }
+.event-basic-form { padding: 13px; border-radius: 9px; }
+.event-field { gap: 4px; margin-bottom: 9px; }
+.event-field input, .event-field textarea, .event-field select { min-height: 40px; padding: 8px 10px; }
+.event-field textarea { line-height: 1.5; }
+.event-field-help, .event-field-error { font-size: 12px; line-height: 1.45; }
+.event-button { min-height: 40px; padding: 7px 17px; }
+.event-actions { padding-top: 12px; margin-top: 12px; }
+.candidate-calendar { padding: 13px; margin-bottom: 12px; border-radius: 9px; }
+.candidate-calendar-heading { gap: 14px; margin-bottom: 10px; }
+.candidate-calendar-heading h3 { margin-bottom: 2px; font-size: 15px; }
+.candidate-calendar-heading p { line-height: 1.45; }
+.candidate-calendar-navigation button { min-width: 34px; height: 34px; }
+.candidate-calendar-months { gap: 16px; }
+.candidate-calendar-month h3 { margin-bottom: 6px; font-size: 13px; }
+.candidate-calendar-grid, .candidate-calendar-weekdays, .candidate-calendar-days { gap: 2px; }
+.candidate-calendar-weekdays { margin-bottom: 2px; }
+.candidate-calendar-days button { min-height: 31px; border-radius: 5px; font-size: 12px; }
+.candidate-calendar-count { margin-top: 8px; font-size: 12px; }
+.event-range-picker { gap: 10px 18px; margin-bottom: 12px; padding: 11px 13px; }
+.event-range-controls select { height: 38px; }
+.event-grid-toolbar { gap: 9px; padding: 8px 11px; margin-bottom: 10px; }
+.event-time-table thead th, .admin-candidate-table thead th { height: 32px; }
+.event-time-cell, .admin-candidate-table .event-time-cell { height: 40px; }
+.event-grid-help { padding: 9px 12px; margin-block: 10px 6px; line-height: 1.5; }
+.event-success { padding-top: 18px; }
+.event-success-heading { margin-bottom: 16px; }
+.event-success-check { width: 48px; height: 48px; margin-bottom: 10px; }
+.event-success-heading h2 { margin-bottom: 7px; font-size: 23px; }
+.event-share { padding: 14px; margin-top: 10px; border-radius: 9px; }
+.event-share p { margin: 4px 0 8px; line-height: 1.5; }
+.event-save-warning { padding: 12px; margin-top: 12px; line-height: 1.5; }
+
+.compact-home { padding-block: 22px 32px; }
+.compact-home-intro { gap: 24px; padding: 16px 0; }
+.compact-home-intro h1 { font-size: clamp(27px, 3.2vw, 40px); }
+.compact-home-intro span { margin-top: 6px; }
+.compact-home-preview { max-width: none; margin-top: 16px; border-radius: 9px; }
+.compact-preview-head { padding: 9px 12px; }
+.compact-preview-table > * { min-height: 38px; }
+.created-event-history { margin-top: 16px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.created-event-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 12px; background: var(--aqua); }
+.created-event-history-heading h2 { margin: 0; font-size: 15px; }
+.created-event-history-heading span { color: var(--muted); font-size: 11px; }
+.created-event-history ul { margin: 0; padding: 0; list-style: none; }
+.created-event-history li { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 7px 12px; border-top: 1px solid var(--line); }
+.created-event-history li > div { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.created-event-history li strong { overflow-wrap: anywhere; }
+.created-event-history li small { flex: 0 0 auto; color: var(--muted); }
+.created-event-history nav { flex: 0 0 auto; display: flex; gap: 6px; }
+.created-event-history a { min-height: 34px; display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid #a8bfce; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 700; }
+.created-event-history a:hover { background: var(--aqua); }
+
+.participant-summary-compact { gap: 18px; padding-block: 14px 10px; }
+.participant-summary-compact h1 { margin: 3px 0; font-size: clamp(23px, 2.5vw, 31px); }
+.participant-board-workspace { padding-block: 12px 6px; }
+.public-board-heading { margin-bottom: 4px; }
+.public-board-heading h2 { font-size: 18px; }
+.public-board-guide { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+.timeline-date-groups { display: grid; gap: 10px; }
+.timeline-date-group { min-width: 0; }
+.timeline-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 7px; scrollbar-color: #8da9b9 #edf3f6; }
+.timeline-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.timeline-table th, .timeline-table td { padding: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: center; }
+.timeline-table tr:last-child > * { border-bottom: 0; }
+.timeline-table tr > :last-child { border-right: 0; }
+.timeline-table thead th { min-width: 42px; width: 42px; height: 28px; padding: 0 2px; color: #456176; background: var(--aqua); font-size: 9px; font-weight: 650; white-space: nowrap; }
+.timeline-table .timeline-sticky-column { position: sticky; left: 0; z-index: 2; min-width: 142px; width: 142px; padding-inline: 9px; background: #fff; text-align: left; font-size: 12px; }
+.timeline-table thead .timeline-sticky-column { z-index: 3; background: var(--aqua); font-size: 11px; }
+.public-board-table .public-board-name { min-width: 142px; width: 142px; }
+.public-board-mark, .public-board-slot-blocked { width: 42px; height: 36px; }
+.public-board-mark { font-size: 17px; }
+.public-board-slot-blocked, .response-slot-blocked { background: #d9dcdf; }
+.public-board-empty { padding: 10px; border: 0; }
+.public-comments { grid-template-columns: 80px minmax(0, 1fr); gap: 8px 14px; margin-top: 10px; }
+.public-comments ul { gap: 4px 14px; }
+.public-comments li { padding: 5px 0; }
+
+.response-modal { width: min(1380px, 100%); max-height: calc(100dvh - 28px); }
+.response-modal-header { padding: 10px 14px; }
+.response-modal-body { padding: 12px 14px; }
+.response-modal-identity { gap: 12px; margin-bottom: 10px; }
+.participant-field { gap: 4px; }
+.participant-field input, .participant-field textarea { min-height: 40px; padding: 8px 10px; }
+.response-grid-heading { margin-bottom: 8px; }
+.response-grid-heading h2 { font-size: 16px; }
+.response-grid-controls { gap: 14px; margin-bottom: 10px; }
+.response-mark { min-height: 42px; gap: 7px; }
+.response-mark span { font-size: 21px; }
+.response-mode-picker { min-width: 330px; }
+.response-mode-picker button { min-height: 42px; }
+.response-grid-scroll { overflow: visible; border: 0; }
+.response-time-table thead th { min-width: 42px; width: 42px; height: 28px; }
+.response-time-table .response-date-column { min-width: 142px; width: 142px; }
+.response-slot, .response-slot-blocked { width: 42px; height: 38px; }
+.response-slot { font-size: 18px; }
+.response-modal-footer { padding: 8px 14px; }
+
+.admin-candidate-only { padding-block: 18px 32px; }
+.admin-candidate-shell { width: min(1440px, calc(100% - 32px)); }
+.admin-candidate-header { gap: 18px; padding-bottom: 12px; margin-bottom: 12px; }
+.admin-candidate-header h1 { font-size: clamp(24px, 2.5vw, 31px); }
+.admin-candidate-header span { margin-top: 4px; }
+.admin-candidate-only .admin-candidate-editor { padding: 14px; border-radius: 9px; }
+.admin-lifecycle-heading { margin-bottom: 10px; }
+.admin-lifecycle-heading h2 { font-size: 18px; }
+.admin-candidate-editor .candidate-calendar { max-width: none; }
+.admin-candidate-scroll { margin-top: 10px; }
+.admin-operation-message { min-height: 18px; margin: 6px 0; }
+.admin-login-page { padding-block: 34px 48px; }
+.admin-login-layout { gap: clamp(32px, 6vw, 72px); }
+.admin-login-intro h1 { margin-bottom: 12px; font-size: clamp(34px, 4vw, 48px); }
+.admin-login-intro > p:last-child { font-size: 14px; line-height: 1.6; }
+.admin-login-form { padding: 22px; border-radius: 12px; }
+.verification-page-state { padding-block: clamp(42px, 8vw, 88px); }
+.verification-page-state h1 + p { margin: 12px auto 18px; line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .event-create-upper { grid-template-columns: 1fr; }
+  .event-create-upper > .event-basic-form,
+  .event-create-calendar-panel .event-step-heading,
+  .event-create-calendar-panel .candidate-calendar { grid-column: 1; grid-row: auto; }
+  .response-grid-controls { gap: 10px; }
+}
+
+@media (max-width: 640px) {
+  .shell, .participant-page .shell, .admin-candidate-shell { width: min(100% - 20px, 1440px); }
+  .header-inner { min-height: 48px; }
+  .site-footer .shell { padding-block: 9px; }
+  .form-shell { padding-block: 12px 20px; }
+  .page-heading { margin-block: 10px; }
+  .page-heading h1 { font-size: 25px; }
+  .event-create-upper { gap: 9px; }
+  .candidate-calendar { padding: 10px; }
+  .candidate-calendar-heading { display: grid; gap: 7px; }
+  .candidate-calendar-navigation { justify-self: end; }
+  .candidate-calendar-months { gap: 8px; }
+  .candidate-calendar-days button { min-height: 28px; }
+  .event-actions { position: static; }
+  .compact-home { padding-block: 12px 20px; }
+  .compact-home-intro { display: grid; gap: 14px; padding: 10px 0 14px; }
+  .compact-home-intro h1 { font-size: 28px; }
+  .compact-home-preview { margin-top: 12px; overflow-x: auto; }
+  .compact-preview-head, .compact-preview-table { min-width: 560px; }
+  .created-event-history li { align-items: stretch; display: grid; gap: 7px; }
+  .created-event-history nav { display: grid; grid-template-columns: 1fr 1fr; }
+  .created-event-history a { justify-content: center; }
+  .participant-summary-compact { padding-block: 10px 8px; }
+  .participant-summary-compact h1 { font-size: 24px; }
+  .participant-board-workspace { padding-block: 9px 4px; }
+  .timeline-date-groups { gap: 8px; }
+  .timeline-table thead th { min-width: 39px; width: 39px; }
+  .timeline-table .timeline-sticky-column,
+  .public-board-table .public-board-name,
+  .response-time-table .response-date-column { min-width: 104px; width: 104px; padding-inline: 6px; }
+  .public-board-mark, .public-board-slot-blocked,
+  .response-slot, .response-slot-blocked { width: 39px; height: 39px; }
+  .public-comments { grid-template-columns: 1fr; }
+  .response-modal-body { padding: 9px 10px; }
+  .response-grid-heading p { margin-top: 3px; }
+  .response-mark { min-height: 52px; }
+  .response-mode-picker button { min-height: 40px; }
+  .admin-candidate-only { padding-block: 10px 20px; }
+  .admin-candidate-header { gap: 10px; padding-bottom: 9px; margin-bottom: 9px; }
+  .admin-candidate-only .admin-candidate-editor { padding: 10px; }
+  .admin-lifecycle-heading { gap: 6px; }
+  .admin-login-page { padding-block: 20px 30px; }
+  .admin-login-layout { gap: 18px; }
+  .admin-login-intro h1 { font-size: 31px; }
+  .admin-login-form { padding: 16px; }
+}

@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 import type { AdminEvent } from '../../../functions/admin/service';
 import { formatSlotEnd, formatSlotStart } from '../../domain/slots';
@@ -10,6 +9,7 @@ import {
   validateCandidateDays,
   type CandidateDayDraft,
 } from '../event-create/event-draft';
+import { CandidateDateCalendar } from '../event-create/CandidateDateCalendar';
 import { createCandidateDays } from './admin-schedule-model';
 
 const SLOTS = Array.from({ length: 36 }, (_, index) => index + 12);
@@ -23,31 +23,18 @@ type Props = {
   event: AdminEvent;
   isMutating: boolean;
   message: string;
+  currentDate: string;
   onSave: (days: CandidateDayDraft[]) => void;
 };
 
-export function AdminCandidateEditor({ event, isMutating, message, onSave }: Props) {
+export function AdminCandidateEditor({ event, isMutating, message, currentDate, onSave }: Props) {
   const [days, setDays] = useState(() => createCandidateDays(event.candidateSlots));
-  const [date, setDate] = useState('');
   const [error, setError] = useState('');
 
-  function addDate(submitEvent: FormEvent) {
-    submitEvent.preventDefault();
-    if (!date) {
-      setError('追加する候補日を選択してください。');
-      return;
-    }
-    if (days.some((day) => day.date === date)) {
-      setError('その候補日は追加済みです。');
-      return;
-    }
-    if (days.length >= 20) {
-      setError('候補日は20日まで追加できます。');
-      return;
-    }
-    setDays((current) => [...current, { date, slotIndexes: [] }]
-      .sort((left, right) => left.date.localeCompare(right.date)));
-    setDate('');
+  function toggleDate(date: string) {
+    setDays((current) => current.some((day) => day.date === date)
+      ? removeCandidateDay(current, date)
+      : [...current, { date, slotIndexes: [] }].sort((left, right) => left.date.localeCompare(right.date)));
     setError('');
   }
 
@@ -66,16 +53,7 @@ export function AdminCandidateEditor({ event, isMutating, message, onSave }: Pro
       <div><p>日程管理</p><h2 id="admin-candidates-heading">候補日時を編集</h2></div>
       <p>変更すると既存回答にも反映されます。削除した時間の回答は取り除かれます。</p>
     </div>
-    <form className="admin-add-date" onSubmit={addDate}>
-      <div className="event-field">
-        <label htmlFor="admin-candidate-date">追加する候補日</label>
-        <input id="admin-candidate-date" type="date" value={date}
-          onChange={(changeEvent) => setDate(changeEvent.target.value)} />
-      </div>
-      <button type="submit" className="event-button event-button-secondary" disabled={isMutating}>
-        <Plus size={17} aria-hidden="true" />候補日を追加
-      </button>
-    </form>
+    <CandidateDateCalendar days={days} currentDate={currentDate} onToggleDate={toggleDate} />
     <div className="admin-candidate-scroll" role="region" tabIndex={0} aria-label="候補日時の編集表スクロール領域">
       <table className="admin-candidate-table" aria-label="候補日時の編集">
         <thead><tr><th scope="col" className="admin-date-column">候補日</th>

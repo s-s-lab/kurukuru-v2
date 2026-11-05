@@ -22,7 +22,7 @@ const adminEvent: AdminEvent = {
 function renderPage(fetcher: typeof fetch) {
   return render(<MemoryRouter initialEntries={[`/events/${eventId}/admin`]}>
     <Routes><Route path="/events/:eventId/admin" element={
-      <AdminEventPage apiBaseUrl="https://api.example.test/api/v1" fetcher={fetcher} />
+      <AdminEventPage apiBaseUrl="https://api.example.test/api/v1" fetcher={fetcher} today="2026-11-05" />
     } /></Routes>
   </MemoryRouter>);
 }
@@ -102,8 +102,8 @@ describe('候補日時専用の管理ページ', () => {
     const user = userEvent.setup();
     renderPage(fetcher);
     await screen.findByRole('heading', { name: adminEvent.title });
-    await user.type(screen.getByLabelText('追加する候補日'), '2026-11-12');
-    await user.click(screen.getByRole('button', { name: '候補日を追加' }));
+    expect(screen.getAllByRole('group', { name: /のカレンダー/ })).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: '2026年11月12日を候補日に追加' }));
     await user.click(screen.getByRole('button', { name: '11月12日 10:00〜10:30 選択' }));
     await user.click(screen.getByRole('button', { name: '候補日時を保存' }));
 
