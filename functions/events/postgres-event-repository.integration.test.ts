@@ -43,16 +43,18 @@ describe.skipIf(!pool)('Postgresイベントリポジトリ統合', () => {
     };
 
     try {
-      const [created, concurrentReplay] = await Promise.all([
+      const [firstResult, concurrentResult] = await Promise.all([
         repository.createEvent(input),
         repository.createEvent(input),
       ]);
+      const created = firstResult.created ? firstResult : concurrentResult;
       createdEventIds.push(created.event.id);
       const replayed = await repository.createEvent(input);
       const fetched = await repository.getPublicEvent(created.event.id);
 
-      expect(concurrentReplay).toEqual(created);
-      expect(replayed).toEqual(created);
+      expect([firstResult.created, concurrentResult.created].sort()).toEqual([false, true]);
+      expect(concurrentResult.event).toEqual(firstResult.event);
+      expect(replayed).toEqual({ ...created, created: false });
       expect(fetched).toEqual(created.event);
       expect(created.event).toMatchObject({
         title: input.event.title,

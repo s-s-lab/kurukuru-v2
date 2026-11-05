@@ -17,9 +17,9 @@ describe('Kurukuruの入口', () => {
       </HashRouter>,
     );
 
-    expect(screen.getByRole('heading', { name: '時間帯をなぞるだけ。' })).toBeInTheDocument();
-    expect(screen.getByText(/参加者の回答があると、主催者に通知が「くる」/)).toBeInTheDocument();
-    expect(screen.getByText(/通知くるくる！/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '候補時間を選んで、URLを共有。' })).toBeInTheDocument();
+    expect(screen.getByText(/ひとつの公開ボードで比べられます/)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '回答ボードの表示例' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '日程調整を作成' })).toHaveAttribute(
       'href',
       '#/events/new',

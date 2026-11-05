@@ -20,7 +20,11 @@ export type CreateEventPersistenceInput = {
   };
 };
 
+export type CreateEventPersistenceResult = CreateEventResult & {
+  created: boolean;
+};
+
 export interface EventRepository {
-  createEvent(input: CreateEventPersistenceInput): Promise<CreateEventResult>;
+  createEvent(input: CreateEventPersistenceInput): Promise<CreateEventPersistenceResult>;
   getPublicEvent(eventId: string): Promise<PublicEvent | null>;
 }

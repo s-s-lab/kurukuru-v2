@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createEventService } from './event-service';
 import type {
@@ -26,7 +26,7 @@ function createRepositoryFake() {
   const repository: EventRepository = {
     async createEvent(input) {
       createInputs.push(input);
-      return { event: publicEvent, emailVerificationRequired: true };
+      return { event: publicEvent, emailVerificationRequired: true, created: true };
     },
     async getPublicEvent(eventId) {
       getIds.push(eventId);
@@ -92,5 +92,46 @@ describe('イベントサービス', () => {
 
     await expect(service.getPublicEvent(publicEvent.id)).resolves.toEqual(publicEvent);
     expect(getIds).toEqual([publicEvent.id]);
+  });
+
+  it('通知ONの新規作成時だけ主催者確認メールを自動送信する', async () => {
+    const { repository } = createRepositoryFake();
+    const send = vi.fn().mockResolvedValue({ providerMessageId: 'mail-1' });
+    const service = createEventService(repository, {
+      generateToken: () => 'verification-token-raw',
+      mailSender: { send },
+      publicBaseUrl: 'https://kurukuru-app.jp',
+    });
+
+    await service.createEvent({ idempotencyKey: 'create-event-mail-1', request: {
+      title: '研究会', description: '', organizerEmail: 'organizer@example.com',
+      adminPassword: 'password', notifyOnResponse: true,
+      candidateSlots: [{ date: '2026-11-04', slotIndexes: [18] }],
+    } });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'organizer@example.com',
+      text: expect.stringContaining('verification-token-raw'),
+    }));
+  });
+
+  it('通知OFFでは確認メールを送らず、送信失敗でもイベント作成を成功させる', async () => {
+    const { repository } = createRepositoryFake();
+    const send = vi.fn().mockRejectedValue(new Error('mail unavailable'));
+    const service = createEventService(repository, {
+      mailSender: { send }, publicBaseUrl: 'https://kurukuru-app.jp',
+    });
+    const baseRequest = {
+      title: '研究会', description: '', organizerEmail: 'organizer@example.com',
+      adminPassword: 'password', candidateSlots: [{ date: '2026-11-04', slotIndexes: [18] }],
+    };
+
+    await expect(service.createEvent({ idempotencyKey: 'create-event-mail-off',
+      request: { ...baseRequest, notifyOnResponse: false } })).resolves.toMatchObject({ event: publicEvent });
+    expect(send).not.toHaveBeenCalled();
+    await expect(service.createEvent({ idempotencyKey: 'create-event-mail-failure',
+      request: { ...baseRequest, notifyOnResponse: true } })).resolves.toMatchObject({ event: publicEvent });
+    expect(send).toHaveBeenCalledTimes(1);
   });
 });

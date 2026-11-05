@@ -16,7 +16,7 @@ export function NewEventPage() {
       <div className="page-heading">
         <p>イベント作成</p>
         <h1>日程調整を作成</h1>
-        <span>まず基本情報を入力し、次に候補日と時間帯を選びます。</span>
+        <span>基本情報、候補日、時間帯をこの画面でまとめて設定します。</span>
       </div>
       <EventCreateFlow today={currentDate} apiBaseUrl={import.meta.env.VITE_API_BASE_URL || '/api/v1'} location={window.location} />
     </main>

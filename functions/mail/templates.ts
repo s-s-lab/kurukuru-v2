@@ -66,7 +66,7 @@ export function responseNotificationMail(input: {
   publicBaseUrl: string;
   idempotencyKey: string;
 }): MailMessage {
-  const adminLink = appUrl(input.publicBaseUrl, `events/${input.eventId}/admin`);
+  const publicBoardLink = appUrl(input.publicBaseUrl, `events/${input.eventId}`);
   const created = input.kind === 'created';
   const subject = created
     ? `【Kurukuru】「${input.eventTitle}」に回答が届きました`
@@ -79,8 +79,8 @@ export function responseNotificationMail(input: {
     text: [
       `「${input.eventTitle}」に、${input.respondentName}さん${action}`,
       '',
-      '回答内容は主催者画面で確認してください。',
-      adminLink,
+      '回答内容は公開回答ボードで確認してください。',
+      publicBoardLink,
       '',
       footerText,
     ].join('\n'),
@@ -88,8 +88,8 @@ export function responseNotificationMail(input: {
       '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#102a43;line-height:1.7">',
       `<h1 style="font-size:20px">${created ? '新しい回答が届きました' : '回答が更新されました'}</h1>`,
       `<p>「${escapeHtml(input.eventTitle)}」に、${escapeHtml(input.respondentName)}さん${action}</p>`,
-      '<p>回答内容は主催者画面で確認してください。</p>',
-      `<p><a href="${escapeHtml(adminLink)}" style="display:inline-block;background:#087f8c;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none">主催者画面を開く</a></p>`,
+      '<p>回答内容は公開回答ボードで確認してください。</p>',
+      `<p><a href="${escapeHtml(publicBoardLink)}" style="display:inline-block;background:#087f8c;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none">公開回答ボードを開く</a></p>`,
       footerHtml,
       '</div>',
     ].join(''),

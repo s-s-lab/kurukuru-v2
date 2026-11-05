@@ -53,10 +53,11 @@ describe('participant event page', () => {
     renderPage(fetcher);
 
     expect(await screen.findByRole('heading', { name: event.title })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '回答を追加' }));
     await user.type(screen.getByLabelText(/お名前/), '山田 太郎');
     await user.click(screen.getByRole('button', { name: '回答を保存' }));
 
-    expect(await screen.findByText('回答を保存しました')).toBeInTheDocument();
+    expect(await screen.findAllByText('回答を保存しました')).not.toHaveLength(0);
     const post = calls.find(([, init]) => init?.method === 'POST');
     expect(post?.[1]?.headers).toEqual(expect.objectContaining({
       'idempotency-key': expect.any(String),
@@ -79,11 +80,12 @@ describe('participant event page', () => {
     const user = userEvent.setup();
     renderPage(fetcher);
     await screen.findByRole('heading', { name: event.title });
+    await user.click(screen.getByRole('button', { name: '回答を追加' }));
     await user.type(screen.getByLabelText(/お名前/), '山田 太郎');
     await user.click(screen.getByRole('button', { name: '回答を保存' }));
-    expect(await screen.findByText('一時的に利用できません。')).toBeInTheDocument();
+    expect(await screen.findAllByText('一時的に利用できません。')).not.toHaveLength(0);
     await user.click(screen.getByRole('button', { name: '回答を保存' }));
-    expect(await screen.findByText('回答を保存しました')).toBeInTheDocument();
+    expect(await screen.findAllByText('回答を保存しました')).not.toHaveLength(0);
     expect(keys).toEqual([keys[0], keys[0]]);
   });
 
@@ -96,10 +98,12 @@ describe('participant event page', () => {
     const user = userEvent.setup();
     renderPage(fetcher);
 
+    expect(await screen.findByRole('button', { name: '自分の回答を編集' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '自分の回答を編集' }));
     expect(await screen.findByDisplayValue('山田 太郎')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(editToken);
     await user.click(screen.getByRole('button', { name: '回答を更新' }));
-    expect(await screen.findByText('回答を更新しました')).toBeInTheDocument();
+    expect(await screen.findAllByText('回答を更新しました')).not.toHaveLength(0);
     expect(fetcher).toHaveBeenCalledWith(
       `https://api.example.test/api/v1/responses/${responseId}`,
       expect.objectContaining({

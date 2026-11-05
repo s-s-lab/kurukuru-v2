@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { BasicInformationStep } from './BasicInformationStep';
 import { CandidateTimeStep } from './CandidateTimeStep';
-import { ConfirmationStep } from './ConfirmationStep';
 import { EventCreationSuccess } from './EventCreationSuccess';
-import { EventStepIndicator } from './EventStepIndicator';
 import { createEvent, EventApiError } from './event-api';
 import { buildEventUrls, createEmptyEventDraft, removeCandidateDay, toCreateEventRequest, toggleCandidateSlot, validateBasicInformation, validateCandidateDays } from './event-draft';
 import type { BrowserLocation, EventDraft, FieldErrors } from './event-draft';
@@ -25,7 +23,6 @@ const failureMessage = 'イベントを作成できませんでした。時間�
 export function EventCreateFlow({ today, apiBaseUrl, location, createEventRequest = createEvent,
   createIdempotencyKey = randomKey, copyText = copyToClipboard }: EventCreateFlowProps) {
   const [draft, setDraft] = useState(createEmptyEventDraft);
-  const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
   const [submissionError, setSubmissionError] = useState<{ message: string; requestId?: string }>();
@@ -35,8 +32,8 @@ export function EventCreateFlow({ today, apiBaseUrl, location, createEventReques
   const flow = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    flow.current?.querySelector<HTMLHeadingElement>('h2')?.focus();
-  }, [step, eventId]);
+    if (eventId) flow.current?.querySelector<HTMLHeadingElement>('h2')?.focus();
+  }, [eventId]);
 
   function draftChanged() {
     idempotencyKey.current = undefined;
@@ -47,18 +44,6 @@ export function EventCreateFlow({ today, apiBaseUrl, location, createEventReques
     if (draft[field] === value) return;
     draftChanged();
     setDraft((previous) => ({ ...previous, [field]: value }));
-  }
-
-  function next() {
-    const nextErrors = step === 1 ? validateBasicInformation(draft) : validateCandidateDays(draft.candidateDays);
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length === 0) setStep((previous) => previous + 1);
-  }
-
-  function back() {
-    if (submitting.current) return;
-    setErrors({});
-    setStep((previous) => previous - 1);
   }
 
   function addDate(date: string) {
@@ -127,6 +112,17 @@ export function EventCreateFlow({ today, apiBaseUrl, location, createEventReques
 
   async function submit() {
     if (submitting.current) return;
+    const nextErrors = {
+      ...validateBasicInformation(draft),
+      ...validateCandidateDays(draft.candidateDays),
+    };
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      requestAnimationFrame(() => {
+        flow.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+      });
+      return;
+    }
     submitting.current = true;
     setPending(true);
     setSubmissionError(undefined);
@@ -151,15 +147,32 @@ export function EventCreateFlow({ today, apiBaseUrl, location, createEventReques
   return (
     <div className="event-create-flow" ref={flow}>
       {eventId ? <EventCreationSuccess {...buildEventUrls(eventId, location)} copyText={copyText} /> : <>
-        <EventStepIndicator currentStep={step} />
-        {step === 1 ? <BasicInformationStep draft={draft} errors={errors} onChange={changeField} onNext={next} /> : null}
-        {step === 2 ? <CandidateTimeStep days={draft.candidateDays} currentDate={today} errors={errors}
+        <form className="event-create-single-form" noValidate onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}>
+          <div className="event-create-upper">
+            <BasicInformationStep draft={draft} errors={errors} onChange={changeField} />
+            <div className="event-create-calendar-panel">
+              <CandidateTimeStep days={draft.candidateDays} currentDate={today} errors={errors}
           onToggleDate={toggleDate} onApplyRange={applyRange} onClearAllSlots={clearAllSlots} onRemoveDate={(date) => {
             draftChanged();
             setDraft((previous) => ({ ...previous, candidateDays: removeCandidateDay(previous.candidateDays, date) }));
             setErrors({});
-          }} onPaintSlot={paintSlot} onToggleSlot={toggleSlot} onBack={back} onNext={next} /> : null}
-        {step === 3 ? <ConfirmationStep draft={draft} pending={pending} error={submissionError} onBack={back} onSubmit={() => { void submit(); }} /> : null}
+          }} onPaintSlot={paintSlot} onToggleSlot={toggleSlot} />
+            </div>
+          </div>
+          {submissionError ? <div className="event-submit-error" role="alert">
+            <p>{submissionError.message}</p>
+            {submissionError.requestId ? <small>リクエストID: {submissionError.requestId}</small> : null}
+          </div> : null}
+          <div className="event-actions event-actions-end event-create-submit">
+            <span role="status" aria-live="polite">{pending ? '作成しています…' : ''}</span>
+            <button type="submit" className="event-button event-button-primary" disabled={pending}>
+              {pending ? '作成中…' : '日程調整を作成'}
+            </button>
+          </div>
+        </form>
       </>}
     </div>
   );

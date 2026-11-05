@@ -1,22 +1,15 @@
-import type { FormEvent } from 'react';
-
 import type { EventDraft, FieldErrors } from './event-draft';
 
 type BasicInformationStepProps = {
   draft: EventDraft;
   errors: FieldErrors;
   onChange: <K extends keyof EventDraft>(field: K, value: EventDraft[K]) => void;
-  onNext: () => void;
+  onNext?: () => void;
 };
 
 export function BasicInformationStep({ draft, errors, onChange, onNext }: BasicInformationStepProps) {
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    onNext();
-  }
-
   return (
-    <form className="event-basic-form" noValidate onSubmit={submit} aria-labelledby="basic-heading">
+    <section className="event-basic-form" aria-labelledby="basic-heading">
       <div className="event-step-heading">
         <h2 id="basic-heading" tabIndex={-1}>基本情報を入力してください</h2>
         <p>日程調整の名前と、主催者の連絡先を設定します。</p>
@@ -61,9 +54,9 @@ export function BasicInformationStep({ draft, errors, onChange, onNext }: BasicI
       <p className="event-validation-summary" role="status" aria-live="polite">
         {Object.keys(errors).length > 0 ? '入力内容を確認してください。' : ''}
       </p>
-      <div className="event-actions event-actions-end">
-        <button type="submit" className="event-button event-button-primary">次へ</button>
-      </div>
-    </form>
+      {onNext ? <div className="event-actions event-actions-end">
+        <button type="button" className="event-button event-button-primary" onClick={onNext}>次へ</button>
+      </div> : null}
+    </section>
   );
 }

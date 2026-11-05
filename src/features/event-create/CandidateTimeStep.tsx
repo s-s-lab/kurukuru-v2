@@ -23,8 +23,8 @@ type CandidateTimeStepProps = {
   onClearAllSlots: () => void;
   onPaintSlot: (date: string, slot: number, selected: boolean) => void;
   onToggleSlot: (date: string, slot: number) => void;
-  onBack: () => void;
-  onNext: () => void;
+  onBack?: () => void;
+  onNext?: () => void;
 };
 
 type PaintGesture = { pointerId: number; selected: boolean; visited: Set<string> };
@@ -157,10 +157,10 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
       {days.length === 0 ? <p className="event-grid-empty">候補日を追加すると、時間を選べます。</p> : null}
       <p className="event-grid-help" id="candidate-grid-help">06:00〜24:00の時間表です。スマートフォンで横へ動かすときは「移動」に切り替えてください。</p>
       <p className="event-field-error" role="status" aria-live="polite">{errors.candidateDays || ''}</p>
-      <div className="event-actions">
-        <button type="button" className="event-button event-button-secondary" onClick={onBack}>戻る</button>
-        <button type="button" className="event-button event-button-primary" onClick={onNext}>次へ</button>
-      </div>
+      {onBack || onNext ? <div className="event-actions">
+        {onBack ? <button type="button" className="event-button event-button-secondary" onClick={onBack}>戻る</button> : null}
+        {onNext ? <button type="button" className="event-button event-button-primary" onClick={onNext}>次へ</button> : null}
+      </div> : null}
     </section>
   );
 }
