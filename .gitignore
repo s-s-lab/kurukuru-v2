@@ -8,4 +8,5 @@ coverage/
 .neon/
 *.log
 .DS_Store
+.worktrees/
 

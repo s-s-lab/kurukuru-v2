@@ -43,8 +43,10 @@ describe('Kurukuru mail templates', () => {
     expect(mail.subject).toBe('【Kurukuru】「11月の研究会」に回答が届きました');
     expect(mail.text).toContain('参加者Aさんから回答が届きました。');
     expect(mail.text).toContain(
-      `https://kurukuru-app.jp/#/events/${eventId}/admin`,
+      `https://kurukuru-app.jp/#/events/${eventId}`,
     );
+    expect(mail.text).not.toContain('/admin');
+    expect(mail.html).toContain('公開回答ボードを開く');
     expect(mail.text).not.toContain('コメント');
     expect(mail.text).not.toContain('候補日時');
     expect(mail.idempotencyKey).toBe('response-created-1');

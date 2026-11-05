@@ -5,7 +5,7 @@ import { Hand, Pencil } from 'lucide-react';
 import type { AvailabilityMark, PublicEvent } from '../../../functions/events/service';
 import { MARKS, type AvailabilityMap } from '../../domain/availability';
 import { formatSlotEnd, formatSlotStart } from '../../domain/slots';
-import { buildGridModel, countAvailabilityBySlot } from './response-model';
+import { buildGridModel } from './response-model';
 
 type Props = {
   event: PublicEvent;
@@ -115,22 +115,5 @@ export function AvailabilityResponseGrid({ event, availability, selectedMark,
       </table>
     </div>
 
-    <div className="response-counts" aria-label="各時間帯の回答人数">
-      <strong>各時間帯の<br />回答人数</strong>
-      {grid.slotIndexes.map((slot) => {
-        const ids = grid.dates.map((date) => grid.slotIds[`${date}:${slot}`]).filter(Boolean);
-        const counts = ids.reduce((total, id) => {
-          const next = countAvailabilityBySlot(event.responses, id);
-          for (const mark of MARKS) total[mark.value] += next[mark.value];
-          return total;
-        }, { best: 0, ok: 0, maybe: 0, ng: 0 });
-        return <div key={slot} aria-label={`${formatSlotStart(slot)}の回答人数`}>
-          <span>{formatSlotStart(slot)}</span>
-          {MARKS.map((mark) => <small key={mark.value} className={`mark-${mark.value}`}>
-            {mark.symbol}{counts[mark.value]}
-          </small>)}
-        </div>;
-      })}
-    </div>
   </section>;
 }

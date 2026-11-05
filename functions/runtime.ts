@@ -69,7 +69,6 @@ export function createRuntimeApp(
   ];
   const pool = dependencies.createPool(environment.DATABASE_URL);
   const repository = new PostgresEventRepository(pool);
-  const eventService = createEventService(repository);
   const rateLimiter = new PostgresRequestRateLimiter(pool);
 
   const responseService = createResponseService(
@@ -93,6 +92,10 @@ export function createRuntimeApp(
       fetcher: dependencies.fetcher,
     })
     : undefined;
+  const eventService = createEventService(repository, {
+    mailSender,
+    publicBaseUrl: environment.KURUKURU_PUBLIC_BASE_URL,
+  });
   const emailVerificationService = hasCompleteMailConfig
     ? createEmailVerificationService({
       repository: new PostgresEmailVerificationRepository(pool),

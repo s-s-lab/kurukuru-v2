@@ -62,24 +62,35 @@ describe('participant availability UI', () => {
     expect(screen.getByRole('button', { name: /11月10日（火） 09:00〜09:30 希望/ })).toHaveTextContent('◎');
   });
 
-  it('switches between paint and move modes and shows response counts', async () => {
+  it('switches between paint and move modes without showing aggregate response counts', async () => {
     const user = userEvent.setup();
     render(<GridHarness />);
     const region = screen.getByRole('region', { name: '回答時間表' });
     expect(region).toHaveClass('is-painting');
     await user.click(screen.getByRole('button', { name: '移動（スクロール）' }));
     expect(region).not.toHaveClass('is-painting');
-    expect(screen.getByLabelText('09:00の回答人数')).toHaveTextContent('◎1');
-    expect(screen.getByLabelText('10:00の回答人数')).toHaveTextContent('×1');
+    expect(screen.queryByLabelText(/回答人数/)).not.toBeInTheDocument();
   });
 
-  it('renders a closed event with a disabled save action', () => {
+  it('opens response entry in a modal and disables the action for a closed event', async () => {
+    const user = userEvent.setup();
     const draft = createResponseDraft(event);
-    render(<ParticipantResponseForm event={{ ...event, status: 'closed' }} draft={draft}
+    const { rerender } = render(<ParticipantResponseForm event={event} draft={draft}
+      selectedMark="best" onSelectedMarkChange={vi.fn()} onDraftChange={vi.fn()}
+      onPaint={vi.fn()} onSubmit={vi.fn()} onShare={vi.fn()} isSubmitting={false}
+      ownsResponse={false} saveMessage="" />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '回答を追加' }));
+    expect(screen.getByRole('dialog', { name: '回答を追加' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/お名前/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '閉じる' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    rerender(<ParticipantResponseForm event={{ ...event, status: 'closed' }} draft={draft}
       selectedMark="best" onSelectedMarkChange={vi.fn()} onDraftChange={vi.fn()}
       onPaint={vi.fn()} onSubmit={vi.fn()} onShare={vi.fn()} isSubmitting={false}
       ownsResponse={false} saveMessage="" />);
     expect(screen.getByText('回答受付は終了しています')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '回答を保存' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '回答を追加' })).toBeDisabled();
   });
 });

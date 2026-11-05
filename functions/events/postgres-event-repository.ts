@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 
-import type { CreateEventPersistenceInput, EventRepository } from './repository';
+import type { CreateEventPersistenceInput, CreateEventPersistenceResult, EventRepository } from './repository';
 import type {
   AvailabilityMark,
   CreateEventResult,
@@ -116,7 +116,7 @@ async function insertCandidateSlots(
 export class PostgresEventRepository implements EventRepository {
   constructor(private readonly pool: Pool) {}
 
-  async createEvent(input: CreateEventPersistenceInput): Promise<CreateEventResult> {
+  async createEvent(input: CreateEventPersistenceInput): Promise<CreateEventPersistenceResult> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -156,7 +156,7 @@ export class PostgresEventRepository implements EventRepository {
           throw new IdempotencyStateError();
         }
         await client.query('COMMIT');
-        return stored.response_body;
+        return { ...stored.response_body, created: false };
       }
 
       const eventResult = await client.query<EventRow>(
@@ -196,7 +196,7 @@ export class PostgresEventRepository implements EventRepository {
         [JSON.stringify(response), input.idempotencyKey],
       );
       await client.query('COMMIT');
-      return response;
+      return { ...response, created: true };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
