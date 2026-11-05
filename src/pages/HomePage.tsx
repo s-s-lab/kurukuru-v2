@@ -1,7 +1,10 @@
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { CreatedEventHistory } from '../features/event-history/CreatedEventHistory';
+import { readCreatedEventHistory } from '../features/event-history/event-history';
 
 export function HomePage() {
+  const history = readCreatedEventHistory();
   return (
     <main className="compact-home shell">
       <section className="compact-home-intro" aria-labelledby="home-title">
@@ -25,6 +28,7 @@ export function HomePage() {
           <strong>田中</strong><i className="is-maybe">△</i><i className="is-ok">○</i><i className="is-ok">○</i><i className="is-ok">○</i>
         </div>
       </section>
+      <CreatedEventHistory items={history} />
     </main>
   );
 }

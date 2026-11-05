@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 
 import { NewEventPage } from '../../pages/NewEventPage';
@@ -33,6 +33,7 @@ async function fillValidDraft(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('イベント作成の一画面フロー', () => {
+  beforeEach(() => localStorage.clear());
   afterEach(cleanup);
 
   it('基本情報、2か月カレンダー、候補時間表、作成操作を同時に表示する', () => {
@@ -89,6 +90,8 @@ describe('イベント作成の一画面フロー', () => {
     expect(screen.getByText('作成しています…')).toHaveAttribute('role', 'status');
     await act(async () => { resolveRequest(createdEvent); });
     expect(screen.getByRole('heading', { name: '日程調整を作成しました' })).toBeInTheDocument();
+    expect(localStorage.getItem('kurukuru:created-events')).toContain('created-event');
+    expect(localStorage.getItem('kurukuru:created-events')).not.toContain('private-password');
   });
 
   it('安全なAPIエラーを表示し、変更なしの再試行では同じ冪等キーを使う', async () => {

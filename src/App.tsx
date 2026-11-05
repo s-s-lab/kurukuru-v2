@@ -32,7 +32,7 @@ export function App() {
         } />
       </Routes>
       <footer className="site-footer">
-        <div className="shell">Kurukuru v2 — 予定を、時間で合わせる。</div>
+        <div className="shell">Kurukuru — 予定を、時間で合わせる。</div>
       </footer>
     </div>
   );

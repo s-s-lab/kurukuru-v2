@@ -6,6 +6,7 @@ import { EventCreationSuccess } from './EventCreationSuccess';
 import { createEvent, EventApiError } from './event-api';
 import { buildEventUrls, createEmptyEventDraft, removeCandidateDay, toCreateEventRequest, toggleCandidateSlot, validateBasicInformation, validateCandidateDays } from './event-draft';
 import type { BrowserLocation, EventDraft, FieldErrors } from './event-draft';
+import { saveCreatedEventHistory } from '../event-history/event-history';
 
 type EventCreateFlowProps = {
   today: string;
@@ -129,6 +130,14 @@ export function EventCreateFlow({ today, apiBaseUrl, location, createEventReques
     try {
       idempotencyKey.current ??= createIdempotencyKey();
       const result = await createEventRequest(toCreateEventRequest(draft), { apiBaseUrl, idempotencyKey: idempotencyKey.current });
+      const urls = buildEventUrls(result.event.id, location);
+      saveCreatedEventHistory({
+        eventId: result.event.id,
+        title: result.event.title,
+        createdAt: result.event.createdAt,
+        participantUrl: urls.participantUrl,
+        organizerUrl: urls.organizerUrl,
+      });
       setEventId(result.event.id);
       setDraft(createEmptyEventDraft());
     } catch (error) {

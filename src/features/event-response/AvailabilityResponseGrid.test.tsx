@@ -10,6 +10,7 @@ import { ParticipantResponseForm } from './ParticipantResponseForm';
 
 const slotA = '33333333-3333-4333-8333-333333333333';
 const slotB = '44444444-4444-4444-8444-444444444444';
+const slotC = '55555555-5555-4555-8555-555555555555';
 const event: PublicEvent = {
   id: '11111111-1111-4111-8111-111111111111',
   title: '11月のプロジェクト定例',
@@ -21,6 +22,7 @@ const event: PublicEvent = {
   candidateSlots: [
     { id: slotA, date: '2026-11-10', slotIndex: 18 },
     { id: slotB, date: '2026-11-10', slotIndex: 20 },
+    { id: slotC, date: '2026-11-12', slotIndex: 19 },
   ],
   responses: [{
     id: '22222222-2222-4222-8222-222222222222',
@@ -52,9 +54,13 @@ describe('participant availability UI', () => {
   it('shows only candidate cells as answerable and paints a chosen mark', async () => {
     const user = userEvent.setup();
     render(<GridHarness />);
-    const table = screen.getByRole('table', { name: '回答する時間表' });
-    expect(within(table).getAllByRole('button')).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: / 09:30〜10:00 / })).not.toBeInTheDocument();
+    const firstDate = screen.getByRole('table', { name: '2026年11月10日の回答時間表' });
+    const secondDate = screen.getByRole('table', { name: '2026年11月12日の回答時間表' });
+    expect(within(firstDate).getAllByRole('button')).toHaveLength(2);
+    expect(within(secondDate).getAllByRole('button')).toHaveLength(1);
+    expect(firstDate.querySelectorAll('.response-slot-blocked').length).toBe(34);
+    expect(secondDate.querySelectorAll('.response-slot-blocked').length).toBe(35);
+    expect(within(firstDate).queryByRole('button', { name: / 09:30〜10:00 / })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '希望' }));
     const cell = screen.getByRole('button', { name: /11月10日（火） 09:00〜09:30 不可/ });
