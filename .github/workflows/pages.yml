@@ -1,8 +1,8 @@
 name: Deploy GitHub Pages
 
+# Public release is paused pending the original service developer's permission.
+# Development CI remains separate; deployments require explicit manual dispatch.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
