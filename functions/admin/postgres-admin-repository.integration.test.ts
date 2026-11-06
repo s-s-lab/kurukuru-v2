@@ -56,7 +56,7 @@ describe.skipIf(!pool)('Postgres管理リポジトリ統合', () => {
         eventId,
         tokenHash,
         request: {
-          title: 'メール変更統合', description: '',
+          title: 'メール変更統合', description: '', duration: '',
           organizerEmail: 'new-owner@example.com', notifyOnResponse: true,
         },
       });
@@ -101,7 +101,7 @@ describe.skipIf(!pool)('Postgres管理リポジトリ統合', () => {
         eventId,
         tokenHash,
         request: {
-          title: '更新後', description: '更新説明',
+          title: '更新後', description: '更新説明', duration: '1時間程度',
           organizerEmail: 'admin@example.com', notifyOnResponse: false,
         },
       });

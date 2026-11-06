@@ -9,7 +9,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 const databaseUrl = process.env.DATABASE_URL;
 const pool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
 const migrations = ['0000_base.sql', '0001_core_security.sql', '0002_request_rate_limits.sql',
-  '0003_response_version.sql', '0004_notification_generation.sql'];
+  '0003_response_version.sql', '0004_notification_generation.sql',
+  '0005_duration_and_overnight_slots.sql'];
 
 afterAll(async () => { await pool?.end(); });
 
@@ -20,7 +21,7 @@ describe.skipIf(!pool)('DBマイグレーション統合', () => {
     try {
       await client.query(`CREATE SCHEMA "${schema}"`);
       await client.query(`SET search_path TO "${schema}", public`);
-      for (const migration of migrations.slice(0, -1)) {
+      for (const migration of migrations.slice(0, -2)) {
         await client.query(readFileSync(resolve(process.cwd(), 'db/migrations', migration), 'utf8'));
       }
 
@@ -65,7 +66,7 @@ describe.skipIf(!pool)('DBマイグレーション統合', () => {
       );
 
       await client.query(readFileSync(
-        resolve(process.cwd(), 'db/migrations', migrations.at(-1)!),
+        resolve(process.cwd(), 'db/migrations', '0004_notification_generation.sql'),
         'utf8',
       ));
 

@@ -102,6 +102,7 @@ describe.skipIf(!pool)('Postgres通知リポジトリ統合', () => {
         request: {
           title: '通知世代統合',
           description: '',
+          duration: '',
           organizerEmail: 'new-owner@example.com',
           notifyOnResponse: true,
         },

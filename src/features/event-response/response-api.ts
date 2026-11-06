@@ -23,6 +23,7 @@ const publicEventSchema = z.object({
   id: z.uuid(),
   title: z.string(),
   description: z.string(),
+  duration: z.string(),
   status: z.enum(['open', 'closed']),
   finalization: z.object({
     date: z.string(),
@@ -158,6 +159,25 @@ export async function updateParticipantResponse(
         authorization: `Bearer ${options.editToken}`,
         'content-type': 'application/json',
       },
+      body: JSON.stringify(request),
+    },
+    options.fetcher ?? fetch,
+    '回答を保存できませんでした。時間をおいて再度お試しください。',
+  );
+}
+
+export async function updatePublicParticipantResponse(
+  eventId: string,
+  responseId: string,
+  request: ResponseRequest,
+  options: CommonOptions,
+) {
+  return requestJson(
+    updateResponseResultSchema,
+    `${base(options.apiBaseUrl)}/events/${eventId}/responses/${responseId}`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(request),
     },
     options.fetcher ?? fetch,

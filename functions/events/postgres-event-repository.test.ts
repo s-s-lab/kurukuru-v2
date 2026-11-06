@@ -40,7 +40,7 @@ function snapshotPool(options: {
       }
       if (!active) throw new Error('Public reads need a repeatable read, read-only transaction.');
       if (/FROM events/.test(sql)) return { rows: options.missing ? [] : [{
-        id: eventId, title: 'snapshot', description: '', status: 'open',
+        id: eventId, title: 'snapshot', description: '', duration: '90分', status: 'open',
         final_date: null, final_start_slot: null, final_end_slot: null,
         created_at: timestamp, updated_at: timestamp, organizer_email: 'private@example.com',
         admin_secret_hash: 'private-admin-hash',
@@ -72,7 +72,7 @@ describe('公開イベント読取のトランザクション境界', () => {
     const boundary = snapshotPool();
     const result = await new PostgresEventRepository(boundary.pool).getPublicEvent(eventId);
     expect(result).toEqual({
-      id: eventId, title: 'snapshot', description: '', status: 'open', finalization: null,
+      id: eventId, title: 'snapshot', description: '', duration: '90分', status: 'open', finalization: null,
       createdAt: timestamp, updatedAt: timestamp,
       candidateSlots: [{ id: slotId, date: '2027-01-12', slotIndex: 20 }],
       responses: [{ id: responseId, displayName: '参加者', comment: 'snapshot',

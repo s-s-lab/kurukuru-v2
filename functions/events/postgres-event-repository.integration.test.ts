@@ -27,6 +27,7 @@ describe.skipIf(!pool)('Postgresイベントリポジトリ統合', () => {
       event: {
         title: `統合テスト ${unique}`,
         description: 'developmentブランチの自動検証データ',
+        duration: '1時間程度',
         organizerEmail: `integration+${unique}@example.com`,
         adminSecretHash: 'scrypt$test-only-hash',
         notifyOnResponse: true,
@@ -131,6 +132,7 @@ describe.skipIf(!pool)('Postgresイベントリポジトリ統合', () => {
       event: {
         title: `ロールバックテスト ${unique}`,
         description: '',
+        duration: '',
         organizerEmail: `rollback+${unique}@example.com`,
         adminSecretHash: 'scrypt$test-only-hash',
         notifyOnResponse: false,

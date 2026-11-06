@@ -57,7 +57,11 @@ export function responseForStoredEdit(
   event: PublicEvent,
   stored: StoredResponseEdit,
 ): ResponseDraft | null {
-  const response = event.responses.find(({ id }) => id === stored.responseId);
+  return responseForEdit(event, stored.responseId);
+}
+
+export function responseForEdit(event: PublicEvent, responseId: string): ResponseDraft | null {
+  const response = event.responses.find(({ id }) => id === responseId);
   if (!response) return null;
 
   const availability = Object.fromEntries(

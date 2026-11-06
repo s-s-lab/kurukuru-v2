@@ -8,6 +8,7 @@ import {
   createResponseRequest,
   readStoredEdit,
   responseForStoredEdit,
+  responseForEdit,
   storageKey,
   writeStoredEdit,
 } from './response-model';
@@ -21,6 +22,7 @@ const event: PublicEvent = {
   id: eventId,
   title: '11月の定例',
   description: '日程を決めます。',
+  duration: '1時間程度',
   status: 'open',
   finalization: null,
   createdAt: '2026-11-01T00:00:00.000Z',
@@ -73,6 +75,15 @@ describe('participant response model', () => {
     })).toBeNull();
     expect(readStoredEdit('{"responseId":"bad"}')).toBeNull();
     expect(readStoredEdit(null)).toBeNull();
+  });
+
+  it('公開ボードの回答IDから端末情報なしで編集用下書きを作る', () => {
+    expect(responseForEdit(event, responseId)).toEqual({
+      displayName: '山田',
+      comment: '参加します',
+      availability: { [slotA]: 'best', [slotB]: 'ng' },
+    });
+    expect(responseForEdit(event, '55555555-5555-4555-8555-555555555555')).toBeNull();
   });
 
   it('round-trips only the response id and edit token in event-scoped storage data', () => {

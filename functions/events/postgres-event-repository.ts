@@ -28,6 +28,7 @@ type EventRow = {
   id: string;
   title: string;
   description: string;
+  duration: string;
   status: EventStatus;
   final_date: string | null;
   final_start_slot: number | null;
@@ -77,6 +78,7 @@ function mapEvent(
     id: row.id,
     title: row.title,
     description: row.description,
+    duration: row.duration,
     status: row.status,
     finalization:
       row.final_date && row.final_start_slot !== null && row.final_end_slot !== null
@@ -161,13 +163,14 @@ export class PostgresEventRepository implements EventRepository {
 
       const eventResult = await client.query<EventRow>(
         `INSERT INTO events
-           (title, description, organizer_email, admin_secret_hash, notify_on_response)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, title, description, status, final_date::text,
+           (title, description, duration, organizer_email, admin_secret_hash, notify_on_response)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, title, description, duration, status, final_date::text,
                    final_start_slot, final_end_slot, created_at, updated_at`,
         [
           input.event.title,
           input.event.description,
+          input.event.duration,
           input.event.organizerEmail,
           input.event.adminSecretHash,
           input.event.notifyOnResponse,
@@ -210,7 +213,7 @@ export class PostgresEventRepository implements EventRepository {
     try {
       await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
       const eventResult = await client.query<EventRow>(
-        `SELECT id, title, description, status, final_date::text,
+        `SELECT id, title, description, duration, status, final_date::text,
                 final_start_slot, final_end_slot, created_at, updated_at
          FROM events
          WHERE id = $1 AND deleted_at IS NULL AND status <> 'deleted'`,

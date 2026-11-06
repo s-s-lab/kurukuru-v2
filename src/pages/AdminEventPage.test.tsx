@@ -12,7 +12,7 @@ const slotId = '22222222-2222-4222-8222-222222222222';
 const token = 'opaque-admin-session-token';
 const expiresAt = '2099-11-02T12:00:00.000Z';
 const adminEvent: AdminEvent = {
-  id: eventId, title: '11月のプロジェクト定例', description: '説明',
+  id: eventId, title: '11月のプロジェクト定例', description: '説明', duration: '1時間程度',
   organizerEmail: 'owner@example.com', organizerEmailVerified: true,
   notifyOnResponse: true, status: 'open', finalization: null, version: 1,
   createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-01T00:00:00.000Z',

@@ -11,11 +11,13 @@ describe('admin event update validation', () => {
     expect(adminEventUpdateSchema.parse({
       title: '  更新後  ',
       description: '  説明  ',
+      duration: '  1時間程度  ',
       organizerEmail: 'OWNER@Example.COM',
       notifyOnResponse: true,
     })).toEqual({
       title: '更新後',
       description: '説明',
+      duration: '1時間程度',
       organizerEmail: 'owner@example.com',
       notifyOnResponse: true,
     });
@@ -25,7 +27,7 @@ describe('admin event update validation', () => {
     'rejects an invalid organizer email: %s',
     (organizerEmail) => {
       expect(adminEventUpdateSchema.safeParse({
-        title: '更新後', description: '', organizerEmail, notifyOnResponse: true,
+        title: '更新後', description: '', duration: '', organizerEmail, notifyOnResponse: true,
       }).success).toBe(false);
     },
   );
@@ -46,12 +48,18 @@ describe('admin lifecycle validation', () => {
     });
   });
 
+  it('accepts candidate slots through 05:30 on the following day', () => {
+    expect(adminCandidateSlotsSchema.parse({
+      candidateSlots: [{ date: '2026-11-10', slotIndexes: [59] }],
+    })).toEqual({ candidateSlots: [{ date: '2026-11-10', slotIndexes: [59] }] });
+  });
+
   it.each([
     [{ candidateSlots: [] }, 'empty candidate list'],
     [{ candidateSlots: [{ date: '2026-11-10', slotIndexes: [] }] }, 'empty indexes'],
     [{ candidateSlots: [{ date: '2026-02-30', slotIndexes: [12] }] }, 'invalid date'],
     [{ candidateSlots: [{ date: '2026-11-10', slotIndexes: [11] }] }, 'index below range'],
-    [{ candidateSlots: [{ date: '2026-11-10', slotIndexes: [48] }] }, 'index above range'],
+    [{ candidateSlots: [{ date: '2026-11-10', slotIndexes: [60] }] }, 'index above range'],
     [{ candidateSlots: [{ date: '2026-11-10', slotIndexes: [12, 12] }] }, 'duplicate index'],
     [{ candidateSlots: [
       { date: '2026-11-10', slotIndexes: [12] },
@@ -67,18 +75,18 @@ describe('admin lifecycle validation', () => {
     expect(adminFinalizationSchema.parse({
       date: '2026-11-10',
       startSlot: 12,
-      endSlot: 48,
-    })).toEqual({ date: '2026-11-10', startSlot: 12, endSlot: 48 });
+      endSlot: 60,
+    })).toEqual({ date: '2026-11-10', startSlot: 12, endSlot: 60 });
   });
 
   it.each([
     [{ date: '2026-02-30', startSlot: 12, endSlot: 13 }, 'invalid date'],
     [{ date: '2026-11-10', startSlot: 11, endSlot: 13 }, 'start below range'],
-    [{ date: '2026-11-10', startSlot: 48, endSlot: 48 }, 'start above range'],
+    [{ date: '2026-11-10', startSlot: 60, endSlot: 60 }, 'start above range'],
     [{ date: '2026-11-10', startSlot: 12, endSlot: 12 }, 'empty interval'],
     [{ date: '2026-11-10', startSlot: 20, endSlot: 19 }, 'reversed interval'],
     [{ date: '2026-11-10', startSlot: 12.5, endSlot: 14 }, 'fractional index'],
-    [{ date: '2026-11-10', startSlot: 12, endSlot: 49 }, 'end above range'],
+    [{ date: '2026-11-10', startSlot: 12, endSlot: 61 }, 'end above range'],
     [{ date: '2026-11-10', startSlot: 12, endSlot: 13, extra: true }, 'unknown key'],
   ])('rejects invalid finalization: %s (%s)', (input, label) => {
     expect(adminFinalizationSchema.safeParse(input).success, label).toBe(false);

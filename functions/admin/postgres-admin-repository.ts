@@ -16,6 +16,7 @@ type AdminEventRow = {
   id: string;
   title: string;
   description: string;
+  duration: string;
   organizer_email: string;
   organizer_email_verified_at: Date | string | null;
   notify_on_response: boolean;
@@ -48,7 +49,7 @@ type AvailabilityRow = {
   mark: AvailabilityMark;
 };
 
-const EVENT_COLUMNS = `e.id, e.title, e.description, e.organizer_email,
+const EVENT_COLUMNS = `e.id, e.title, e.description, e.duration, e.organizer_email,
   e.organizer_email_verified_at, e.notify_on_response, e.status,
   e.final_date::text, e.final_start_slot, e.final_end_slot, e.version,
   e.created_at, e.updated_at`;
@@ -101,6 +102,7 @@ async function loadAdminEvent(
     id: row.id,
     title: row.title,
     description: row.description,
+    duration: row.duration,
     organizerEmail: row.organizer_email,
     organizerEmailVerified: row.organizer_email_verified_at !== null,
     notifyOnResponse: row.notify_on_response,
@@ -239,22 +241,23 @@ export class PostgresAdminRepository implements AdminRepository {
       if (
         event.title !== input.request.title
         || event.description !== input.request.description
+        || event.duration !== input.request.duration
         || organizerEmailChanged
         || event.notify_on_response !== input.request.notifyOnResponse
       ) {
         const updated = await client.query<AdminEventRow>(
           `UPDATE events
-           SET title = $2, description = $3, organizer_email = $4,
+           SET title = $2, description = $3, duration = $4, organizer_email = $5,
                organizer_email_verified_at = CASE
-                 WHEN $6 THEN NULL ELSE organizer_email_verified_at
+                 WHEN $7 THEN NULL ELSE organizer_email_verified_at
                END,
-               notify_on_response = $5,
+               notify_on_response = $6,
                notification_generation = CASE
-                 WHEN $7 THEN notification_generation + 1 ELSE notification_generation
+                 WHEN $8 THEN notification_generation + 1 ELSE notification_generation
                END,
                version = version + 1, updated_at = now()
            WHERE id = $1
-           RETURNING id, title, description, organizer_email,
+           RETURNING id, title, description, duration, organizer_email,
              organizer_email_verified_at, notify_on_response, status,
              final_date::text, final_start_slot, final_end_slot, version,
              created_at, updated_at`,
@@ -262,6 +265,7 @@ export class PostgresAdminRepository implements AdminRepository {
             input.eventId,
             input.request.title,
             input.request.description,
+            input.request.duration,
             input.request.organizerEmail,
             input.request.notifyOnResponse,
             organizerEmailChanged,
@@ -299,7 +303,7 @@ export class PostgresAdminRepository implements AdminRepository {
           `UPDATE events
            SET status = $2, version = version + 1, updated_at = now()
            WHERE id = $1
-           RETURNING id, title, description, organizer_email,
+           RETURNING id, title, description, duration, organizer_email,
              organizer_email_verified_at, notify_on_response, status,
              final_date::text, final_start_slot, final_end_slot, version,
              created_at, updated_at`,
@@ -384,7 +388,7 @@ export class PostgresAdminRepository implements AdminRepository {
           `UPDATE events
            SET version = version + 1, updated_at = now()
            WHERE id = $1
-           RETURNING id, title, description, organizer_email,
+           RETURNING id, title, description, duration, organizer_email,
              organizer_email_verified_at, notify_on_response, status,
              final_date::text, final_start_slot, final_end_slot, version,
              created_at, updated_at`,
@@ -431,7 +435,7 @@ export class PostgresAdminRepository implements AdminRepository {
          SET final_date = $2, final_start_slot = $3, final_end_slot = $4,
              version = version + 1, updated_at = now()
          WHERE id = $1
-         RETURNING id, title, description, organizer_email,
+         RETURNING id, title, description, duration, organizer_email,
            organizer_email_verified_at, notify_on_response, status,
            final_date::text, final_start_slot, final_end_slot, version,
            created_at, updated_at`,
@@ -458,7 +462,7 @@ export class PostgresAdminRepository implements AdminRepository {
            SET final_date = NULL, final_start_slot = NULL, final_end_slot = NULL,
                version = version + 1, updated_at = now()
            WHERE id = $1
-           RETURNING id, title, description, organizer_email,
+           RETURNING id, title, description, duration, organizer_email,
              organizer_email_verified_at, notify_on_response, status,
              final_date::text, final_start_slot, final_end_slot, version,
              created_at, updated_at`,

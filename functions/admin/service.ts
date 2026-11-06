@@ -8,6 +8,7 @@ export type AdminEvent = {
   id: string;
   title: string;
   description: string;
+  duration: string;
   organizerEmail: string;
   organizerEmailVerified: boolean;
   notifyOnResponse: boolean;
@@ -27,6 +28,7 @@ export type AdminEvent = {
 export type AdminEventUpdateRequest = {
   title: string;
   description: string;
+  duration: string;
   organizerEmail: string;
   notifyOnResponse: boolean;
 };

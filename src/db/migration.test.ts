@@ -10,6 +10,10 @@ const notificationGenerationMigrationPath = resolve(
   process.cwd(),
   'db/migrations/0004_notification_generation.sql',
 );
+const durationAndOvernightMigrationPath = resolve(
+  process.cwd(),
+  'db/migrations/0005_duration_and_overnight_slots.sql',
+);
 
 describe('初期DBマイグレーション', () => {
   it('回答versionを既存行に1として追加し正の整数に制限する', () => {
@@ -62,6 +66,15 @@ describe('初期DBマイグレーション', () => {
     expect(sql).toMatch(/UPDATE events[\s\S]+notify_on_response = false/);
     expect(sql).toMatch(/organizer_email_verified_at IS NULL/);
     expect(sql).toMatch(/DELETE FROM notification_outbox AS n[\s\S]+status IN \('pending', 'failed'\)/);
+    expect(sql).not.toMatch(/DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)/i);
+  });
+
+  it('所要時間と翌朝までの候補枠を既存DBへ追加する', () => {
+    const sql = readFileSync(durationAndOvernightMigrationPath, 'utf8');
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS duration text NOT NULL DEFAULT ''");
+    expect(sql).toMatch(/slot_index BETWEEN 12 AND 59/);
+    expect(sql).toMatch(/final_start_slot BETWEEN 12 AND 59/);
+    expect(sql).toMatch(/final_end_slot BETWEEN 13 AND 60/);
     expect(sql).not.toMatch(/DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)/i);
   });
 });

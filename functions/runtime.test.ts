@@ -78,6 +78,7 @@ describe('管理APIランタイム', () => {
       id: '9bed1489-b31f-4b6d-8dcb-e8d95109f98c',
       title: '管理イベント',
       description: '',
+      duration: '',
       organizerEmail: 'organizer@example.com',
       organizerEmailVerified: false,
       notifyOnResponse: true,

@@ -26,6 +26,7 @@ function adminPool(options: {
   let version = 1;
   let title = '研究会';
   let description = '説明';
+  let duration = '1時間程度';
   let organizerEmail = 'organizer@example.com';
   let organizerEmailVerifiedAt: string | null = options.organizerEmailVerified
     ? timestamp
@@ -38,6 +39,7 @@ function adminPool(options: {
     id: eventId,
     title,
     description,
+    duration,
     organizer_email: organizerEmail,
     organizer_email_verified_at: organizerEmailVerifiedAt,
     notify_on_response: notifyOnResponse,
@@ -68,12 +70,13 @@ function adminPool(options: {
       if (/UPDATE events\s+SET title/.test(sql)) {
         title = String(parameters?.[1]);
         description = String(parameters?.[2]);
-        if (/organizer_email = \$4/.test(sql)) {
-          organizerEmail = String(parameters?.[3]);
-          if (parameters?.[5]) organizerEmailVerifiedAt = null;
-          notifyOnResponse = Boolean(parameters?.[4]);
+        duration = String(parameters?.[3]);
+        if (/organizer_email = \$5/.test(sql)) {
+          organizerEmail = String(parameters?.[4]);
+          if (parameters?.[6]) organizerEmailVerifiedAt = null;
+          notifyOnResponse = Boolean(parameters?.[5]);
         } else {
-          notifyOnResponse = Boolean(parameters?.[3]);
+          notifyOnResponse = Boolean(parameters?.[4]);
         }
         version += 1;
         return { rows: [eventRow()], rowCount: 1 };
@@ -113,7 +116,7 @@ function adminPool(options: {
     outcome: () => outcome,
     released: () => released,
     state: () => ({
-      status, version, title, description, organizerEmail,
+      status, version, title, description, duration, organizerEmail,
       organizerEmailVerified: organizerEmailVerifiedAt !== null, notifyOnResponse,
     }),
   };
@@ -132,6 +135,7 @@ function candidatePool(initialCandidates: Array<{
     id: eventId,
     title: '研究会',
     description: '説明',
+    duration: '1時間程度',
     organizer_email: 'organizer@example.com',
     organizer_email_verified_at: null,
     notify_on_response: true,
@@ -195,6 +199,7 @@ function lifecyclePool(options: {
     id: eventId,
     title: '研究会',
     description: '説明',
+    duration: '1時間程度',
     organizer_email: 'organizer@example.com',
     organizer_email_verified_at: null,
     notify_on_response: true,
@@ -318,12 +323,12 @@ describe('PostgresAdminRepository', () => {
       eventId,
       tokenHash: 'session-hash',
       request: {
-        title: '更新後', description: '新しい説明',
+        title: '更新後', description: '新しい説明', duration: '90分',
         organizerEmail: 'organizer@example.com', notifyOnResponse: false,
       },
     });
 
-    expect(result).toMatchObject({ title: '更新後', description: '新しい説明', notifyOnResponse: false, version: 2 });
+    expect(result).toMatchObject({ title: '更新後', description: '新しい説明', duration: '90分', notifyOnResponse: false, version: 2 });
     expect(boundary.outcome()).toBe('COMMIT');
   });
 
@@ -333,7 +338,7 @@ describe('PostgresAdminRepository', () => {
       eventId,
       tokenHash: 'session-hash',
       request: {
-        title: '研究会', description: '説明',
+        title: '研究会', description: '説明', duration: '1時間程度',
         organizerEmail: 'new-owner@example.com', notifyOnResponse: true,
       },
     });
@@ -357,7 +362,7 @@ describe('PostgresAdminRepository', () => {
       eventId,
       tokenHash: 'session-hash',
       request: {
-        title: '更新後', description: '説明',
+        title: '更新後', description: '説明', duration: '1時間程度',
         organizerEmail: 'organizer@example.com', notifyOnResponse: true,
       },
     });
@@ -375,7 +380,7 @@ describe('PostgresAdminRepository', () => {
       eventId,
       tokenHash: 'session-hash',
       request: {
-        title: '研究会', description: '説明',
+        title: '研究会', description: '説明', duration: '1時間程度',
         organizerEmail: 'organizer@example.com', notifyOnResponse: false,
       },
     });

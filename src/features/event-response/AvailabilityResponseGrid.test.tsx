@@ -15,6 +15,7 @@ const event: PublicEvent = {
   id: '11111111-1111-4111-8111-111111111111',
   title: '11月のプロジェクト定例',
   description: 'みなさんの都合のよい日時を教えてください。',
+  duration: '1時間程度',
   status: 'open',
   finalization: null,
   createdAt: '2026-11-01T00:00:00.000Z',
@@ -58,8 +59,8 @@ describe('participant availability UI', () => {
     const secondDate = screen.getByRole('table', { name: '2026年11月12日の回答時間表' });
     expect(within(firstDate).getAllByRole('button')).toHaveLength(2);
     expect(within(secondDate).getAllByRole('button')).toHaveLength(1);
-    expect(firstDate.querySelectorAll('.response-slot-blocked').length).toBe(34);
-    expect(secondDate.querySelectorAll('.response-slot-blocked').length).toBe(35);
+    expect(firstDate.querySelectorAll('.response-slot-blocked').length).toBe(46);
+    expect(secondDate.querySelectorAll('.response-slot-blocked').length).toBe(47);
     expect(within(firstDate).queryByRole('button', { name: / 09:30〜10:00 / })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '希望' }));
@@ -81,10 +82,26 @@ describe('participant availability UI', () => {
   it('opens response entry in a modal and disables the action for a closed event', async () => {
     const user = userEvent.setup();
     const draft = createResponseDraft(event);
-    const { rerender } = render(<ParticipantResponseForm event={event} draft={draft}
-      selectedMark="best" onSelectedMarkChange={vi.fn()} onDraftChange={vi.fn()}
-      onPaint={vi.fn()} onSubmit={vi.fn()} onShare={vi.fn()} isSubmitting={false}
-      ownsResponse={false} saveMessage="" />);
+    const baseProps = {
+      event,
+      draft,
+      selectedMark: 'best' as const,
+      onSelectedMarkChange: vi.fn(),
+      onDraftChange: vi.fn(),
+      onPaint: vi.fn(),
+      onSubmit: vi.fn(),
+      onShare: vi.fn(),
+      isSubmitting: false,
+      isEditing: false,
+      onEditResponse: vi.fn(),
+      saveMessage: '',
+    };
+    function FormHarness({ currentEvent = event }: { currentEvent?: PublicEvent }) {
+      const [open, setOpen] = useState(false);
+      return <ParticipantResponseForm {...baseProps} event={currentEvent}
+        editorOpen={open} onOpenNew={() => setOpen(true)} onCloseEditor={() => setOpen(false)} />;
+    }
+    const { rerender } = render(<FormHarness />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '回答を追加' }));
     expect(screen.getByRole('dialog', { name: '回答を追加' })).toBeInTheDocument();
@@ -92,10 +109,7 @@ describe('participant availability UI', () => {
     await user.click(screen.getByRole('button', { name: '閉じる' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    rerender(<ParticipantResponseForm event={{ ...event, status: 'closed' }} draft={draft}
-      selectedMark="best" onSelectedMarkChange={vi.fn()} onDraftChange={vi.fn()}
-      onPaint={vi.fn()} onSubmit={vi.fn()} onShare={vi.fn()} isSubmitting={false}
-      ownsResponse={false} saveMessage="" />);
+    rerender(<FormHarness currentEvent={{ ...event, status: 'closed' }} />);
     expect(screen.getByText('回答受付は終了しています')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '回答を追加' })).toBeDisabled();
   });

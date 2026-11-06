@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import type { AvailabilityMark, PublicEvent } from '../../functions/events/service';
@@ -8,17 +8,13 @@ import {
   createParticipantResponse,
   getPublicEvent,
   ResponseApiError,
-  updateParticipantResponse,
+  updatePublicParticipantResponse,
 } from '../features/event-response/response-api';
 import {
   createResponseDraft,
   createResponseRequest,
-  readStoredEdit,
-  responseForStoredEdit,
-  storageKey,
+  responseForEdit,
   type ResponseDraft,
-  type StoredResponseEdit,
-  writeStoredEdit,
 } from '../features/event-response/response-model';
 
 type Props = {
@@ -31,15 +27,21 @@ function newIdempotencyKey() {
 }
 
 function replaceResponse(event: PublicEvent, response: PublicEvent['responses'][number]): PublicEvent {
-  const others = event.responses.filter(({ id }) => id !== response.id);
-  return { ...event, responses: [...others, response] };
+  const exists = event.responses.some(({ id }) => id === response.id);
+  return {
+    ...event,
+    responses: exists
+      ? event.responses.map((current) => current.id === response.id ? response : current)
+      : [...event.responses, response],
+  };
 }
 
 export function ParticipantEventPage({ apiBaseUrl, fetcher }: Props) {
   const { eventId = '' } = useParams();
   const [event, setEvent] = useState<PublicEvent | null>(null);
   const [draft, setDraft] = useState<ResponseDraft | null>(null);
-  const [storedEdit, setStoredEdit] = useState<StoredResponseEdit | null>(null);
+  const [editingResponseId, setEditingResponseId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [selectedMark, setSelectedMark] = useState<AvailabilityMark>('best');
   const [loadError, setLoadError] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
@@ -49,18 +51,15 @@ export function ParticipantEventPage({ apiBaseUrl, fetcher }: Props) {
     () => new Set(event?.candidateSlots.map(({ id }) => id) ?? []),
     [event],
   );
+  const closeEditor = useCallback(() => setEditorOpen(false), []);
 
   useEffect(() => {
     let active = true;
     getPublicEvent(eventId, { apiBaseUrl, fetcher }).then((loaded) => {
       if (!active) return;
-      const stored = readStoredEdit(localStorage.getItem(storageKey(eventId)));
-      const restored = stored ? responseForStoredEdit(loaded, stored) : null;
-      if (stored && !restored) localStorage.removeItem(storageKey(eventId));
       setEvent(loaded);
       setLoadError('');
-      setStoredEdit(restored ? stored : null);
-      setDraft(restored ?? createResponseDraft(loaded));
+      setDraft(createResponseDraft(loaded));
     }).catch((error: unknown) => {
       if (!active) return;
       setLoadError(error instanceof Error ? error.message : 'イベントを読み込めませんでした。');
@@ -79,10 +78,9 @@ export function ParticipantEventPage({ apiBaseUrl, fetcher }: Props) {
     setIsSubmitting(true);
     setSaveMessage('');
     try {
-      if (storedEdit) {
-        const result = await updateParticipantResponse(storedEdit.responseId, request, {
+      if (editingResponseId) {
+        const result = await updatePublicParticipantResponse(event.id, editingResponseId, request, {
           apiBaseUrl,
-          editToken: storedEdit.editToken,
           fetcher,
         });
         setEvent((current) => current ? replaceResponse(current, result.response) : current);
@@ -93,16 +91,11 @@ export function ParticipantEventPage({ apiBaseUrl, fetcher }: Props) {
           idempotencyKey: idempotencyKey.current,
           fetcher,
         });
-        const nextStored = { responseId: result.response.id, editToken: result.editToken };
-        try {
-          localStorage.setItem(storageKey(event.id), writeStoredEdit(nextStored));
-          setSaveMessage('回答を保存しました');
-        } catch {
-          setSaveMessage('回答を保存しました。編集情報を端末に保存できませんでした。');
-        }
-        setStoredEdit(nextStored);
+        setSaveMessage('回答を保存しました');
         setEvent((current) => current ? replaceResponse(current, result.response) : current);
+        idempotencyKey.current = newIdempotencyKey();
       }
+      setEditorOpen(false);
     } catch (error) {
       setSaveMessage(error instanceof ResponseApiError
         ? error.message
@@ -125,6 +118,24 @@ export function ParticipantEventPage({ apiBaseUrl, fetcher }: Props) {
   if (loadError) return <main className="shell participant-state"><h1>イベントを表示できません</h1><p>{loadError}</p></main>;
   if (!event || !draft) return <main className="shell participant-state"><p>イベントを読み込んでいます…</p></main>;
 
+  function openNewResponse() {
+    if (!event) return;
+    setEditingResponseId(null);
+    setDraft(createResponseDraft(event));
+    setSaveMessage('');
+    setEditorOpen(true);
+  }
+
+  function openExistingResponse(responseId: string) {
+    if (!event || event.status === 'closed') return;
+    const nextDraft = responseForEdit(event, responseId);
+    if (!nextDraft) return;
+    setEditingResponseId(responseId);
+    setDraft(nextDraft);
+    setSaveMessage('');
+    setEditorOpen(true);
+  }
+
   return <ParticipantResponseForm event={event} draft={draft}
     selectedMark={selectedMark} onSelectedMarkChange={setSelectedMark}
     onDraftChange={(field, value) => setDraft((current) => current ? { ...current, [field]: value } : current)}
@@ -133,5 +144,7 @@ export function ParticipantEventPage({ apiBaseUrl, fetcher }: Props) {
       availability: applyPaint(current.availability, slotIds, mark, candidateSlotIds),
     } : current)}
     onSubmit={submit} onShare={share} isSubmitting={isSubmitting}
-    ownsResponse={Boolean(storedEdit)} saveMessage={saveMessage} />;
+    editorOpen={editorOpen} isEditing={Boolean(editingResponseId)}
+    onOpenNew={openNewResponse} onEditResponse={openExistingResponse}
+    onCloseEditor={closeEditor} saveMessage={saveMessage} />;
 }

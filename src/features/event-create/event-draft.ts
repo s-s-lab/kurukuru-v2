@@ -6,6 +6,7 @@ export type CandidateDayDraft = { date: string; slotIndexes: number[] };
 export type EventDraft = {
   title: string;
   description: string;
+  duration: string;
   organizerEmail: string;
   adminPassword: string;
   notifyOnResponse: boolean;
@@ -18,6 +19,7 @@ export function createEmptyEventDraft(): EventDraft {
   return {
     title: '',
     description: '',
+    duration: '',
     organizerEmail: '',
     adminPassword: '',
     notifyOnResponse: true,
@@ -34,6 +36,9 @@ export function validateBasicInformation(draft: EventDraft): FieldErrors {
   }
   if (draft.description.trim().length > 2000) {
     errors.description = '説明は2000文字以内で入力してください。';
+  }
+  if (draft.duration.trim().length > 100) {
+    errors.duration = '所要時間は100文字以内で入力してください。';
   }
   const email = draft.organizerEmail.trim();
   if (email.length > 254 || !z.email().safeParse(email).success) {
@@ -62,7 +67,7 @@ export function validateCandidateDays(days: CandidateDayDraft[]): FieldErrors {
     try {
       assertCandidateSlots(day.slotIndexes);
     } catch {
-      return { candidateDays: '候補時間は06:00〜24:00の30分単位で指定してください。' };
+      return { candidateDays: '候補時間は06:00〜翌06:00の30分単位で指定してください。' };
     }
   }
   return {};
@@ -94,6 +99,7 @@ export function toCreateEventRequest(draft: EventDraft) {
   return {
     title: draft.title.trim(),
     description: draft.description.trim(),
+    duration: draft.duration.trim(),
     organizerEmail: draft.organizerEmail.trim().toLowerCase(),
     adminPassword: draft.adminPassword,
     notifyOnResponse: draft.notifyOnResponse,

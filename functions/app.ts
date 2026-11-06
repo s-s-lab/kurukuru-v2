@@ -362,6 +362,32 @@ export function createApp(config: AppConfig) {
     return context.json(result, 200);
   });
 
+  app.patch('/api/v1/events/:eventId/responses/:responseId', async (context) => {
+    const requestId = context.get('requestId');
+    const eventId = context.req.param('eventId').toLowerCase();
+    const responseId = context.req.param('responseId').toLowerCase();
+    if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(responseId).success) {
+      throw new ResponseNotFoundError();
+    }
+    const limited = await enforceRateLimit(context, {
+      scope: 'update-response-global', subject: 'all', limit: 300, windowSeconds: 60,
+    }) ?? await enforceRateLimit(context, {
+      scope: 'update-response-id', subject: responseId, limit: 60, windowSeconds: 600,
+    });
+    if (limited) return limited;
+    const parsed = await readResponseRequest(context);
+    if (parsed.error) return parsed.error;
+    if (!config.responseService) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    const result = await config.responseService.updatePublicResponse({
+      eventId,
+      responseId,
+      request: parsed.request,
+    });
+    return context.json(result, 200);
+  });
+
   function readAdminAccess(context: Context<AppEnvironment>) {
     const rawEventId = context.req.param('eventId');
     const sessionToken = extractBearerToken(context.req.header('authorization'));
