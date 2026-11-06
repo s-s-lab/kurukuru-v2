@@ -31,6 +31,33 @@ jobs:
         run: npm run build
         env:
           VITE_API_BASE_URL: https://br-icy-dew-aowwun6d-kurukuruapi.compute.c-2.ap-southeast-1.aws.neon.tech/api/v1
+      # Temporary suspension pending consent from the original service developer.
+      # Keep building the app for validation, but never expose dist assets to visitors.
+      # IMPORTANT: Do not remove this block until the owner explicitly authorizes reopening.
+      - name: Replace public site with temporary suspension page
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          cat > dist/index.html <<'HTML'
+          <!doctype html>
+          <html lang="ja">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="robots" content="noindex, nofollow, noarchive">
+            <title>Kurukuru | 公開一時停止中</title>
+            <style>
+              body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8fafc; font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #253445; }
+              main { width: min(90vw, 560px); padding: 36px 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; text-align: center; }
+              h1 { margin: 0 0 16px; font-size: 26px; }
+              p { margin: 0; line-height: 1.8; }
+            </style>
+          </head>
+          <body><main><h1>Kurukuru</h1><p>現在、サービスの公開を一時停止しております。</p></main></body>
+          </html>
+          HTML
+          cp dist/index.html dist/404.html
+          printf '%s\n' 'User-agent: *' 'Disallow: /' > dist/robots.txt
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
