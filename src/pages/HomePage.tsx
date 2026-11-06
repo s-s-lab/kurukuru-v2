@@ -9,7 +9,7 @@ export function HomePage() {
     <main className="compact-home shell">
       <section className="compact-home-intro" aria-labelledby="home-title">
         <div>
-          <p>30分単位の日程調整</p>
+          <p>30分単位の日程調整ツール　―参加者が回答すると通知がくるくる！</p>
           <h1 id="home-title">候補時間を選んで、URLを共有。</h1>
           <span>登録不要。みんなの回答を、ひとつの公開ボードで比べられます。</span>
         </div>
