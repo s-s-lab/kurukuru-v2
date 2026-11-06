@@ -26,7 +26,7 @@ export function validateFinalization(
   request: AdminFinalizationRequest,
 ): string {
   const day = days.find(({ date }) => date === request.date);
-  if (!day || request.startSlot < 12 || request.endSlot > 48 || request.endSlot <= request.startSlot) {
+  if (!day || request.startSlot < 12 || request.endSlot > 60 || request.endSlot <= request.startSlot) {
     return '候補日に含まれる日時を選択してください。';
   }
   const slots = new Set(day.slotIndexes);

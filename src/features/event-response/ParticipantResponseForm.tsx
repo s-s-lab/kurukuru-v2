@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { CalendarDays, Share2 } from 'lucide-react';
 
 import type { AvailabilityMark, PublicEvent } from '../../../functions/events/service';
@@ -16,7 +16,11 @@ type Props = {
   onSubmit: () => void;
   onShare: () => void;
   isSubmitting: boolean;
-  ownsResponse: boolean;
+  editorOpen: boolean;
+  isEditing: boolean;
+  onOpenNew: () => void;
+  onEditResponse: (responseId: string) => void;
+  onCloseEditor: () => void;
   saveMessage: string;
 };
 
@@ -31,14 +35,14 @@ function dateRange(event: PublicEvent) {
 }
 
 export function ParticipantResponseForm(props: Props) {
-  const { event, onShare, ownsResponse, saveMessage } = props;
-  const [editorOpen, setEditorOpen] = useState(false);
+  const { event, onShare, editorOpen, isEditing, onOpenNew, onEditResponse,
+    onCloseEditor, saveMessage } = props;
   const openButton = useRef<HTMLButtonElement>(null);
   const closed = event.status === 'closed';
   const closeEditor = useCallback(() => {
-    setEditorOpen(false);
+    onCloseEditor();
     requestAnimationFrame(() => openButton.current?.focus());
-  }, []);
+  }, [onCloseEditor]);
 
   return <main className="participant-page">
     <section className="participant-summary shell participant-summary-compact">
@@ -48,6 +52,7 @@ export function ParticipantResponseForm(props: Props) {
           <span><CalendarDays size={16} aria-hidden="true" />{dateRange(event)}</span>
         </div>
         <h1>{event.title}</h1>
+        {event.duration ? <p className="participant-duration">所要時間：{event.duration}</p> : null}
         {event.description ? <p>{event.description}</p> : null}
       </div>
       <div className="participant-actions">
@@ -55,8 +60,8 @@ export function ParticipantResponseForm(props: Props) {
           <Share2 size={17} aria-hidden="true" />共有
         </button>
         <button ref={openButton} type="button" className="event-button event-button-primary"
-          disabled={closed} onClick={() => setEditorOpen(true)}>
-          {ownsResponse ? '自分の回答を編集' : '回答を追加'}
+          disabled={closed} onClick={onOpenNew}>
+          回答を追加
         </button>
       </div>
     </section>
@@ -64,11 +69,11 @@ export function ParticipantResponseForm(props: Props) {
       <strong>確定日時</strong><span>{event.finalization.date}</span>
     </section> : null}
     <div className="shell participant-board-workspace">
-      <PublicAvailabilityBoard event={event} />
+      <PublicAvailabilityBoard event={event} onEditResponse={onEditResponse} />
       <p className="participant-save-message" role="status" aria-live="polite">
         {closed ? '回答受付は終了しています' : saveMessage}
       </p>
     </div>
-    {editorOpen ? <ResponseEditorModal {...props} onClose={closeEditor} /> : null}
+    {editorOpen ? <ResponseEditorModal {...props} isEditing={isEditing} onClose={closeEditor} /> : null}
   </main>;
 }

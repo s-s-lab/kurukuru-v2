@@ -17,6 +17,7 @@ import type { RequestRateLimiter } from './security/rate-limit';
 const validEventRequest = {
   title: '研究会の日程調整',
   description: '参加できる時間を選択してください。',
+  duration: '1時間程度',
   organizerEmail: 'organizer@example.com',
   adminPassword: 'correct-horse-battery-staple',
   notifyOnResponse: true,
@@ -34,6 +35,7 @@ function createEventServiceFake(): EventService & {
     id: '9bed1489-b31f-4b6d-8dcb-e8d95109f98c',
     title: validEventRequest.title,
     description: validEventRequest.description,
+    duration: validEventRequest.duration,
     status: 'open' as const,
     finalization: null,
     createdAt: '2026-10-29T07:00:00.000Z',
@@ -365,6 +367,7 @@ function responseServiceFake(): ResponseService {
   return {
     createResponse: vi.fn(async () => ({ response: publicResponse, editToken: 'edit-token' })),
     updateResponse: vi.fn(async () => ({ response: publicResponse })),
+    updatePublicResponse: vi.fn(async () => ({ response: publicResponse })),
   };
 }
 
@@ -408,6 +411,24 @@ describe('回答API', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ response: publicResponse });
     expect(responseService.updateResponse).toHaveBeenCalledWith({ responseId, editToken: 'edit-token', request: { ...responseRequest, displayName: '参加者', comment: 'よろしくお願いします' } });
+  });
+
+  it('イベントページからの公開PATCHはBearerなしで対象回答を更新する', async () => {
+    const responseService = responseServiceFake();
+    const app = createApp({ allowedOrigins: [], responseService });
+    const headers = { ...responseHeaders() };
+    delete (headers as Partial<typeof headers>).authorization;
+    const response = await app.request(
+      `/api/v1/events/${eventId.toUpperCase()}/responses/${responseId.toUpperCase()}`,
+      { method: 'PATCH', headers, body: JSON.stringify(responseRequest) },
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ response: publicResponse });
+    expect(responseService.updatePublicResponse).toHaveBeenCalledWith({
+      eventId,
+      responseId,
+      request: { ...responseRequest, displayName: '参加者', comment: 'よろしくお願いします' },
+    });
   });
 
   it.each([undefined, '', 'short', 'x'.repeat(129)])('不正な冪等キー %s は400', async (key) => {
@@ -549,6 +570,7 @@ const adminEvent: AdminEvent = {
   id: eventId,
   title: '研究会の日程調整',
   description: '参加できる時間を選択してください。',
+  duration: '1時間程度',
   organizerEmail: 'organizer@example.com',
   organizerEmailVerified: false,
   notifyOnResponse: true,
@@ -620,6 +642,7 @@ describe('管理コアAPI', () => {
     const app = createApp({ allowedOrigins: [], adminService });
     const update = {
       title: '  更新後  ', description: '  新しい説明  ',
+      duration: '  90分  ',
       organizerEmail: 'ORGANIZER@example.com', notifyOnResponse: false,
     };
 
@@ -637,6 +660,7 @@ describe('管理コアAPI', () => {
       sessionToken: 'plain-admin-session-token',
       request: {
         title: '更新後', description: '新しい説明',
+        duration: '90分',
         organizerEmail: 'organizer@example.com', notifyOnResponse: false,
       },
     });

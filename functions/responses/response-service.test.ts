@@ -9,6 +9,7 @@ import type {
   CreateResponsePersistenceInput,
   ResponseRepository,
   UpdateResponsePersistenceInput,
+  PublicUpdateResponsePersistenceInput,
 } from './service';
 import { responseRequestSchema } from './validation';
 
@@ -35,6 +36,7 @@ const publicResponse: PublicResponse = {
 function repositoryFake() {
   const createInputs: CreateResponsePersistenceInput[] = [];
   const updateInputs: UpdateResponsePersistenceInput[] = [];
+  const publicUpdateInputs: PublicUpdateResponsePersistenceInput[] = [];
   const repository: ResponseRepository = {
     async createResponse(input) {
       createInputs.push(input);
@@ -44,8 +46,12 @@ function repositoryFake() {
       updateInputs.push(input);
       return { response: publicResponse };
     },
+    async updatePublicResponse(input) {
+      publicUpdateInputs.push(input);
+      return { response: publicResponse };
+    },
   };
-  return { repository, createInputs, updateInputs };
+  return { repository, createInputs, updateInputs, publicUpdateInputs };
 }
 
 // Rejecting any of these malformed bodies or losing canonical order must break these tests.
@@ -163,5 +169,13 @@ describe('回答サービス', () => {
     }]);
     expect(JSON.stringify(updateInputs)).not.toContain('provided-edit-token');
     expect(JSON.stringify(updateInputs)).not.toContain(tokenSecret);
+  });
+
+  it('公開更新はイベントIDと回答IDを渡し、編集トークンを要求しない', async () => {
+    const { repository, publicUpdateInputs } = repositoryFake();
+    const service = createResponseService(repository, tokenSecret);
+    const result = await service.updatePublicResponse({ eventId, responseId, request });
+    expect(result).toEqual({ response: publicResponse });
+    expect(publicUpdateInputs).toEqual([{ eventId, responseId, request }]);
   });
 });

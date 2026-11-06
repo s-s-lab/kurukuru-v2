@@ -14,6 +14,7 @@ import {
 const draft: EventDraft = {
   title: '打ち合わせ',
   description: '',
+  duration: '1時間程度',
   organizerEmail: 'organizer@example.com',
   adminPassword: 'password',
   notifyOnResponse: true,
@@ -24,7 +25,7 @@ describe('event creation draft', () => {
   it('starts with empty fields, enabled notifications, and independent candidate arrays', () => {
     const first = createEmptyEventDraft();
     expect(first).toEqual({
-      title: '', description: '', organizerEmail: '', adminPassword: '',
+      title: '', description: '', duration: '', organizerEmail: '', adminPassword: '',
       notifyOnResponse: true, candidateDays: [],
     });
     first.candidateDays.push({ date: '2026-11-10', slotIndexes: [18] });
@@ -58,6 +59,7 @@ describe('event creation draft', () => {
   it.each([
     ['title', 'a'.repeat(101)],
     ['description', 'a'.repeat(2001)],
+    ['duration', 'a'.repeat(101)],
     ['organizerEmail', `${'a'.repeat(250)}@example.com`],
     ['adminPassword', 'a'.repeat(129)],
   ])('rejects %s exceeding the API limit', (field, value) => {
@@ -84,7 +86,7 @@ describe('event creation draft', () => {
     expect(validateCandidateDays([{ date, slotIndexes: [18] }]).candidateDays).toBeTruthy();
   });
 
-  it.each([11, 48, 18.5])('rejects invalid slot index %s', (slotIndex) => {
+  it.each([11, 60, 18.5])('rejects invalid slot index %s', (slotIndex) => {
     expect(validateCandidateDays([{ date: '2026-11-10', slotIndexes: [slotIndex] }])
       .candidateDays).toBeTruthy();
   });
@@ -120,7 +122,7 @@ describe('event creation draft', () => {
   });
 
   it('rejects an invalid slot even when toggling a new day', () => {
-    expect(() => toggleCandidateSlot([], '2026-11-10', 48)).toThrow(RangeError);
+    expect(() => toggleCandidateSlot([], '2026-11-10', 60)).toThrow(RangeError);
   });
 
   it('removes only the specified candidate day without changing the input', () => {
@@ -137,7 +139,7 @@ describe('event creation draft', () => {
 
   it('produces exactly the approved request fields with normalized date and slot order', () => {
     const unsortedDraft: EventDraft = {
-      title: '  打ち合わせ  ', description: '  詳細  ',
+      title: '  打ち合わせ  ', description: '  詳細  ', duration: '  90分  ',
       organizerEmail: ' ORGANIZER@example.com ', adminPassword: ' password ',
       notifyOnResponse: false,
       candidateDays: [
@@ -146,7 +148,7 @@ describe('event creation draft', () => {
       ],
     };
     expect(toCreateEventRequest(unsortedDraft)).toEqual({
-      title: '打ち合わせ', description: '詳細', organizerEmail: 'organizer@example.com',
+      title: '打ち合わせ', description: '詳細', duration: '90分', organizerEmail: 'organizer@example.com',
       adminPassword: ' password ', notifyOnResponse: false,
       candidateSlots: [
         { date: '2026-11-10', slotIndexes: [18, 19] },

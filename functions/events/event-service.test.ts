@@ -12,6 +12,7 @@ const publicEvent: PublicEvent = {
   id: '9bed1489-b31f-4b6d-8dcb-e8d95109f98c',
   title: '研究会の日程調整',
   description: '',
+  duration: '1時間程度',
   status: 'open',
   finalization: null,
   createdAt: '2026-10-29T07:00:00.000Z',
@@ -51,6 +52,7 @@ describe('イベントサービス', () => {
       request: {
         title: '研究会の日程調整',
         description: '',
+        duration: '1時間程度',
         organizerEmail: 'organizer@example.com',
         adminPassword: 'correct-horse-battery-staple',
         notifyOnResponse: true,
@@ -67,6 +69,7 @@ describe('イベントサービス', () => {
       idempotencyKey: 'create-event-00000001',
       event: {
         title: '研究会の日程調整',
+        duration: '1時間程度',
         organizerEmail: 'organizer@example.com',
         adminSecretHash: 'password-hash:28',
         notifyOnResponse: true,
@@ -104,7 +107,7 @@ describe('イベントサービス', () => {
     });
 
     await service.createEvent({ idempotencyKey: 'create-event-mail-1', request: {
-      title: '研究会', description: '', organizerEmail: 'organizer@example.com',
+      title: '研究会', description: '', duration: '', organizerEmail: 'organizer@example.com',
       adminPassword: 'password', notifyOnResponse: true,
       candidateSlots: [{ date: '2026-11-04', slotIndexes: [18] }],
     } });
@@ -123,7 +126,7 @@ describe('イベントサービス', () => {
       mailSender: { send }, publicBaseUrl: 'https://kurukuru-app.jp',
     });
     const baseRequest = {
-      title: '研究会', description: '', organizerEmail: 'organizer@example.com',
+      title: '研究会', description: '', duration: '', organizerEmail: 'organizer@example.com',
       adminPassword: 'password', candidateSlots: [{ date: '2026-11-04', slotIndexes: [18] }],
     };
 

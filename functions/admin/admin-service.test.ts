@@ -11,6 +11,7 @@ const adminEvent: AdminEvent = {
   id: eventId,
   title: '研究会の日程調整',
   description: '候補日時を選んでください。',
+  duration: '1時間程度',
   organizerEmail: 'organizer@example.com',
   organizerEmailVerified: false,
   notifyOnResponse: true,
@@ -97,6 +98,7 @@ describe('admin service', () => {
     const update = {
       title: '更新後の研究会',
       description: '更新後の説明',
+      duration: '90分',
       organizerEmail: 'organizer@example.com',
       notifyOnResponse: false,
     };

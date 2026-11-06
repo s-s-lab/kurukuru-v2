@@ -31,6 +31,14 @@ export function BasicInformationStep({ draft, errors, onChange, onNext }: BasicI
         {errors.description ? <p className="event-field-error" id="event-description-error">{errors.description}</p> : null}
       </div>
       <div className="event-field">
+        <label htmlFor="event-duration">所要時間（任意）</label>
+        <input id="event-duration" value={draft.duration} maxLength={100}
+          placeholder="例：1時間程度" aria-invalid={Boolean(errors.duration)}
+          aria-describedby={errors.duration ? 'event-duration-error' : undefined}
+          onChange={(event) => onChange('duration', event.target.value)} />
+        {errors.duration ? <p className="event-field-error" id="event-duration-error">{errors.duration}</p> : null}
+      </div>
+      <div className="event-field">
         <label htmlFor="event-email">主催者メールアドレス</label>
         <input id="event-email" type="email" autoComplete="email" value={draft.organizerEmail} required
           aria-invalid={Boolean(errors.organizerEmail)} aria-describedby={errors.organizerEmail ? 'event-email-error' : undefined}

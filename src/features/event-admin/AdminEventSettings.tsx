@@ -16,6 +16,7 @@ export function AdminEventSettings({ event, onSave, isSaving, isDisabled = false
   saveMessage, fieldErrors = {} }: Props) {
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description);
+  const [duration, setDuration] = useState(event.duration);
   const [organizerEmail, setOrganizerEmail] = useState(event.organizerEmail);
   const [notifyOnResponse, setNotifyOnResponse] = useState(event.notifyOnResponse);
   const [localTitleError, setLocalTitleError] = useState('');
@@ -25,6 +26,7 @@ export function AdminEventSettings({ event, onSave, isSaving, isDisabled = false
     event_.preventDefault();
     const normalizedTitle = title.trim();
     const normalizedDescription = description.trim();
+    const normalizedDuration = duration.trim();
     const normalizedEmail = organizerEmail.trim().toLowerCase();
     if (!normalizedTitle) {
       setLocalTitleError('イベント名を入力してください。');
@@ -43,6 +45,7 @@ export function AdminEventSettings({ event, onSave, isSaving, isDisabled = false
     void onSave({
       title: normalizedTitle,
       description: normalizedDescription,
+      duration: normalizedDuration,
       organizerEmail: normalizedEmail,
       notifyOnResponse,
     });
@@ -50,6 +53,7 @@ export function AdminEventSettings({ event, onSave, isSaving, isDisabled = false
 
   const titleError = localTitleError || fieldErrors.title?.[0] || '';
   const descriptionError = fieldErrors.description?.[0] || '';
+  const durationError = fieldErrors.duration?.[0] || '';
   const organizerEmailError = localEmailError || fieldErrors.organizerEmail?.[0] || '';
   return <aside className="admin-settings" aria-labelledby="admin-settings-heading">
     <div className="admin-settings-heading">
@@ -90,6 +94,14 @@ export function AdminEventSettings({ event, onSave, isSaving, isDisabled = false
         {descriptionError && <p className="event-field-error" id="admin-description-error">
           {descriptionError}
         </p>}
+      </div>
+      <div className="event-field">
+        <label htmlFor="admin-event-duration">所要時間</label>
+        <input id="admin-event-duration" value={duration} maxLength={100}
+          placeholder="例：1時間程度" aria-invalid={Boolean(durationError)}
+          aria-describedby={durationError ? 'admin-duration-error' : undefined}
+          onChange={(event_) => setDuration(event_.target.value)} />
+        {durationError && <p className="event-field-error" id="admin-duration-error">{durationError}</p>}
       </div>
       <label className="event-checkbox admin-notification-setting">
         <input type="checkbox" checked={notifyOnResponse}

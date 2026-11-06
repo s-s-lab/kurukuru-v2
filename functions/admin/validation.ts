@@ -7,6 +7,7 @@ export const adminSessionRequestSchema = z.object({
 export const adminEventUpdateSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().max(2_000),
+  duration: z.string().trim().max(100),
   organizerEmail: z.string().trim().pipe(z.email().max(254))
     .transform((value) => value.toLowerCase()),
   notifyOnResponse: z.boolean(),
@@ -14,9 +15,9 @@ export const adminEventUpdateSchema = z.object({
 
 const adminCandidateDaySchema = z.object({
   date: z.iso.date(),
-  slotIndexes: z.array(z.number().int().min(12).max(47))
+  slotIndexes: z.array(z.number().int().min(12).max(59))
     .min(1)
-    .max(36)
+    .max(48)
     .refine((slotIndexes) => new Set(slotIndexes).size === slotIndexes.length, {
       message: '同じ時間枠を重複して指定できません。',
     }),
@@ -44,8 +45,8 @@ export const adminCandidateSlotsSchema = z.object({
 
 export const adminFinalizationSchema = z.object({
   date: z.iso.date(),
-  startSlot: z.number().int().min(12).max(47),
-  endSlot: z.number().int().min(13).max(48),
+  startSlot: z.number().int().min(12).max(59),
+  endSlot: z.number().int().min(13).max(60),
 }).strict().refine((value) => value.endSlot > value.startSlot, {
   path: ['endSlot'],
   message: '終了枠は開始枠より後にしてください。',

@@ -3,10 +3,11 @@ import type { PointerEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 
 import { formatSlotEnd, formatSlotStart } from '../../domain/slots';
+import { DAY_SLOT_INDEXES, formatTimelineHeader } from '../../domain/timeline';
 import { CandidateDateCalendar } from './CandidateDateCalendar';
 import type { CandidateDayDraft, FieldErrors } from './event-draft';
 
-const SLOTS = Array.from({ length: 36 }, (_, index) => index + 12);
+const SLOTS = DAY_SLOT_INDEXES;
 
 function formatDate(date: string) {
   const [year, month, day] = date.split('-');
@@ -100,7 +101,7 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
           <span aria-hidden="true">〜</span>
           <label>終了時刻
             <select value={rangeEnd} onChange={(event) => setRangeEnd(Number(event.target.value))}>
-              {Array.from({ length: 48 - rangeStart }, (_, index) => rangeStart + index + 1)
+              {Array.from({ length: 60 - rangeStart }, (_, index) => rangeStart + index + 1)
                 .map((boundary) => <option key={boundary} value={boundary}>{formatSlotEnd(boundary - 1)}</option>)}
             </select>
           </label>
@@ -131,7 +132,8 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
         tabIndex={0} role="region" aria-label="時間表の横スクロール" aria-describedby="candidate-grid-help">
         <table className="event-time-table" aria-label="候補日時の選択">
           <thead><tr><th scope="col" className="event-date-column">候補日</th>
-            {SLOTS.map((slot) => <th scope="col" key={slot}>{formatSlotStart(slot)}</th>)}
+            {SLOTS.map((slot) => <th scope="col" key={slot}
+              title={formatSlotStart(slot)}>{formatTimelineHeader(slot)}</th>)}
           </tr></thead>
           <tbody>{days.map((day) => {
             const selectedSlots = new Set(day.slotIndexes);
@@ -155,7 +157,7 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
         </table>
       </div>
       {days.length === 0 ? <p className="event-grid-empty">候補日を追加すると、時間を選べます。</p> : null}
-      <p className="event-grid-help" id="candidate-grid-help">06:00〜24:00の時間表です。スマートフォンで横へ動かすときは「移動」に切り替えてください。</p>
+      <p className="event-grid-help" id="candidate-grid-help">06:00〜翌06:00の時間表です。スマートフォンで横へ動かすときは「移動」に切り替えてください。</p>
       <p className="event-field-error" role="status" aria-live="polite">{errors.candidateDays || ''}</p>
       {onBack || onNext ? <div className="event-actions">
         {onBack ? <button type="button" className="event-button event-button-secondary" onClick={onBack}>戻る</button> : null}

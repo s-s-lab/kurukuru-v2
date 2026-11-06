@@ -23,6 +23,7 @@ export type PublicEvent = {
   id: string;
   title: string;
   description: string;
+  duration: string;
   status: EventStatus;
   finalization: null | {
     date: string;
@@ -40,6 +41,7 @@ export type CreateEventCommand = {
   request: {
     title: string;
     description: string;
+    duration: string;
     organizerEmail: string;
     adminPassword: string;
     notifyOnResponse: boolean;

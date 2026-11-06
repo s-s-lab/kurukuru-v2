@@ -3,9 +3,9 @@ import { z } from 'zod';
 const candidateDaySchema = z.object({
   date: z.iso.date(),
   slotIndexes: z
-    .array(z.number().int().min(12).max(47))
+    .array(z.number().int().min(12).max(59))
     .min(1)
-    .max(36)
+    .max(48)
     .refine((values) => new Set(values).size === values.length, {
       message: '同じ時間枠を重複して指定できません。',
     }),
@@ -15,6 +15,7 @@ export const createEventRequestSchema = z
   .object({
     title: z.string().trim().min(1).max(100),
     description: z.string().trim().max(2000).optional().default(''),
+    duration: z.string().trim().max(100).optional().default(''),
     organizerEmail: z.email().max(254),
     adminPassword: z.string().min(4).max(128),
     notifyOnResponse: z.boolean().optional().default(true),
