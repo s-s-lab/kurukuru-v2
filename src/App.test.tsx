@@ -18,6 +18,7 @@ describe('Kurukuruの入口', () => {
       </HashRouter>,
     );
 
+    expect(screen.getByText('30分単位の日程調整ツール　―参加者が回答すると通知がくるくる！')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '候補時間を選んで、URLを共有。' })).toBeInTheDocument();
     expect(screen.getByText(/ひとつの公開ボードで比べられます/)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: '回答ボードの表示例' })).toBeInTheDocument();
