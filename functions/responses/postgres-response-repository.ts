@@ -11,6 +11,7 @@ import {
 } from './repository';
 import type {
   CreateResponsePersistenceInput,
+  PublicUpdateResponsePersistenceInput,
   ResponseRepository,
   ResponseRequest,
   UpdateResponsePersistenceInput,
@@ -129,6 +130,32 @@ async function enqueueNotification(
   );
 }
 
+async function persistResponseUpdate(
+  client: PoolClient,
+  response: ResponseRow & EventRow,
+  request: ResponseRequest,
+): Promise<UpdateResponseResult> {
+  assertOpenEvent(response);
+  const availability = await validateAvailability(client, response.event_id, request.availability);
+  const previous = await loadAvailability(client, response.id);
+  const unchanged = response.display_name === request.displayName &&
+    response.comment === request.comment &&
+    previous.length === availability.length &&
+    previous.every((value, index) => value.candidateSlotId === availability[index].candidateSlotId &&
+      value.mark === availability[index].mark);
+  if (unchanged) return { response: mapResponse(response, previous) };
+
+  const updated = await client.query<ResponseRow>(
+    `UPDATE responses SET display_name = $2, comment = $3, version = version + 1, updated_at = now()
+     WHERE id = $1 RETURNING *`,
+    [response.id, request.displayName, request.comment],
+  );
+  await client.query('DELETE FROM response_availability WHERE response_id = $1', [response.id]);
+  await insertAvailability(client, response.id, availability);
+  await enqueueNotification(client, response, updated.rows[0], 'updated');
+  return { response: mapResponse(updated.rows[0], availability) };
+}
+
 export class PostgresResponseRepository implements ResponseRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -230,28 +257,33 @@ export class PostgresResponseRepository implements ResponseRepository {
       if (!response || !validHashMatches(input.editTokenHash, response.edit_secret_hash)) {
         throw new ResponseNotFoundError();
       }
-      assertOpenEvent(response);
-      const availability = await validateAvailability(client, response.event_id, input.request.availability);
-      const previous = await loadAvailability(client, response.id);
-      const unchanged = response.display_name === input.request.displayName &&
-        response.comment === input.request.comment &&
-        previous.length === availability.length &&
-        previous.every((value, index) => value.candidateSlotId === availability[index].candidateSlotId &&
-          value.mark === availability[index].mark);
-      if (unchanged) {
-        await client.query('COMMIT');
-        return { response: mapResponse(response, previous) };
-      }
-      const updated = await client.query<ResponseRow>(
-        `UPDATE responses SET display_name = $2, comment = $3, version = version + 1, updated_at = now()
-         WHERE id = $1 RETURNING *`,
-        [response.id, input.request.displayName, input.request.comment],
-      );
-      await client.query('DELETE FROM response_availability WHERE response_id = $1', [response.id]);
-      await insertAvailability(client, response.id, availability);
-      await enqueueNotification(client, response, updated.rows[0], 'updated');
+      const result = await persistResponseUpdate(client, response, input.request);
       await client.query('COMMIT');
-      return { response: mapResponse(updated.rows[0], availability) };
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updatePublicResponse(input: PublicUpdateResponsePersistenceInput): Promise<UpdateResponseResult> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const existing = await client.query<ResponseRow & EventRow>(
+        `SELECT r.*, e.status, e.deleted_at, e.notify_on_response,
+                e.organizer_email_verified_at, e.notification_generation
+         FROM responses r JOIN events e ON e.id = r.event_id
+         WHERE r.id = $1 AND r.event_id = $2 FOR UPDATE OF r, e`,
+        [input.responseId, input.eventId],
+      );
+      const response = existing.rows[0];
+      if (!response) throw new ResponseNotFoundError();
+      const result = await persistResponseUpdate(client, response, input.request);
+      await client.query('COMMIT');
+      return result;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

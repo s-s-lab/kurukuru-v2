@@ -18,8 +18,8 @@ describe('Kurukuruの入口', () => {
       </HashRouter>,
     );
 
-    expect(screen.getByText('30分単位の日程調整ツール　―参加者が回答すると通知がくるくる！')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '候補時間を選んで、URLを共有。' })).toBeInTheDocument();
+    expect(screen.getByText(/30分単位の日程調整ツール\s*―参加者が回答すると通知がくるくる！/)).toBeInTheDocument();
     expect(screen.getByText(/ひとつの公開ボードで比べられます/)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: '回答ボードの表示例' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '日程調整を作成' })).toHaveAttribute(
@@ -28,6 +28,11 @@ describe('Kurukuruの入口', () => {
     );
     expect(screen.getByText('Kurukuru — 予定を、時間で合わせる。')).toBeInTheDocument();
     expect(screen.queryByText(/Kurukuru v2/)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ご利用にあたって' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'ネクストトントン' }))
+      .toHaveAttribute('href', 'https://nextonton.inotai.net/');
+    expect(screen.getByText(/収益は一切発生しません/)).toBeInTheDocument();
+    expect(screen.getByText(/セキュリティ上のトラブルについても一切責任を負いません/)).toBeInTheDocument();
   });
 
   it('同じブラウザで作成したイベント履歴から回答ボードと管理画面へ移動できる', () => {

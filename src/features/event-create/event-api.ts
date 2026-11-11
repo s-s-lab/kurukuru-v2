@@ -23,6 +23,7 @@ const createEventResultSchema = z.object({
     id: z.uuid(),
     title: z.string(),
     description: z.string(),
+    duration: z.string(),
     status: z.enum(['open', 'closed']),
     finalization: z.object({ date: z.string(), startSlot: z.number(), endSlot: z.number() }).nullable(),
     createdAt: z.string(),

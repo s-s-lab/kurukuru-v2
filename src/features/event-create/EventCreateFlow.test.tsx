@@ -15,7 +15,7 @@ function renderFlow(props: Partial<ComponentProps<typeof EventCreateFlow>> = {})
 
 const createdEvent: CreateEventResult = {
   event: {
-    id: 'created-event', title: '11月の定例ミーティング', description: 'みんなで予定を合わせます。',
+    id: 'created-event', title: '11月の定例ミーティング', description: 'みんなで予定を合わせます。', duration: '1時間程度',
     status: 'open', finalization: null, createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z',
     candidateSlots: [{ id: 'slot-1', date: '2026-11-10', slotIndex: 18 }], responses: [],
   },
@@ -25,6 +25,7 @@ const createdEvent: CreateEventResult = {
 async function fillValidDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('イベント名'), '11月の定例ミーティング');
   await user.type(screen.getByLabelText('説明（任意）'), 'みんなで予定を合わせます。');
+  await user.type(screen.getByLabelText('所要時間（任意）'), '1時間程度');
   await user.type(screen.getByLabelText('主催者メールアドレス'), 'organizer@example.com');
   await user.type(screen.getByLabelText('管理用パスワード'), 'private-password');
   await user.click(screen.getByLabelText('回答時にメールで通知'));
@@ -40,8 +41,12 @@ describe('イベント作成の一画面フロー', () => {
     render(<MemoryRouter><NewEventPage /></MemoryRouter>);
     expect(screen.queryByRole('list', { name: 'イベント作成の進捗' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('イベント名')).toBeInTheDocument();
+    expect(screen.getByLabelText('所要時間（任意）')).toBeInTheDocument();
     expect(screen.getAllByRole('group', { name: /のカレンダー/ })).toHaveLength(2);
-    expect(screen.getByRole('table', { name: '候補日時の選択' })).toBeInTheDocument();
+    const timeline = screen.getByRole('table', { name: '候補日時の選択' });
+    expect(timeline).toBeInTheDocument();
+    expect(within(timeline).getByRole('columnheader', { name: '06' })).toHaveAttribute('title', '06:00');
+    expect(timeline).not.toHaveTextContent('06:30');
     expect(screen.getByRole('button', { name: '日程調整を作成' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '次へ' })).not.toBeInTheDocument();
   });
@@ -82,7 +87,7 @@ describe('イベント作成の一画面フロー', () => {
     await user.dblClick(submit);
     expect(createEventRequest).toHaveBeenCalledTimes(1);
     expect(createEventRequest).toHaveBeenCalledWith({
-      title: '11月の定例ミーティング', description: 'みんなで予定を合わせます。',
+      title: '11月の定例ミーティング', description: 'みんなで予定を合わせます。', duration: '1時間程度',
       organizerEmail: 'organizer@example.com', adminPassword: 'private-password',
       notifyOnResponse: false, candidateSlots: [{ date: '2026-11-10', slotIndexes: [18] }],
     }, { apiBaseUrl: 'https://api.example.test/api/v1', idempotencyKey: 'submission-key' });

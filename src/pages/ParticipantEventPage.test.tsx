@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { storageKey, writeStoredEdit } from '../features/event-response/response-model';
 import { ParticipantEventPage } from './ParticipantEventPage';
 
 const eventId = '11111111-1111-4111-8111-111111111111';
@@ -22,6 +21,7 @@ const event = {
   id: eventId,
   title: '11月のプロジェクト定例',
   description: '都合のよい日時を教えてください。',
+  duration: '1時間程度',
   status: 'open' as const,
   finalization: null,
   createdAt: '2026-11-01T00:00:00.000Z',
@@ -53,6 +53,7 @@ describe('participant event page', () => {
     renderPage(fetcher);
 
     expect(await screen.findByRole('heading', { name: event.title })).toBeInTheDocument();
+    expect(screen.getByText('所要時間：1時間程度')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '回答を追加' }));
     await user.type(screen.getByLabelText(/お名前/), '山田 太郎');
     await user.click(screen.getByRole('button', { name: '回答を保存' }));
@@ -62,7 +63,6 @@ describe('participant event page', () => {
     expect(post?.[1]?.headers).toEqual(expect.objectContaining({
       'idempotency-key': expect.any(String),
     }));
-    expect(localStorage.getItem(storageKey(eventId))).toContain(responseId);
     expect(document.body.textContent).not.toContain(editToken);
   });
 
@@ -89,8 +89,7 @@ describe('participant event page', () => {
     expect(keys).toEqual([keys[0], keys[0]]);
   });
 
-  it('prefills and patches a locally-owned response without displaying its token', async () => {
-    localStorage.setItem(storageKey(eventId), writeStoredEdit({ responseId, editToken }));
+  it('回答者名から別ブラウザでも回答を開き、Bearerなしの公開APIで更新する', async () => {
     const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
       if (!init?.method) return Response.json(event);
       return Response.json({ response: { ...response, comment: '更新' } });
@@ -98,17 +97,16 @@ describe('participant event page', () => {
     const user = userEvent.setup();
     renderPage(fetcher);
 
-    expect(await screen.findByRole('button', { name: '自分の回答を編集' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '自分の回答を編集' }));
+    expect(await screen.findByRole('button', { name: '山田 太郎の回答を編集' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '山田 太郎の回答を編集' }));
     expect(await screen.findByDisplayValue('山田 太郎')).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain(editToken);
     await user.click(screen.getByRole('button', { name: '回答を更新' }));
     expect(await screen.findAllByText('回答を更新しました')).not.toHaveLength(0);
     expect(fetcher).toHaveBeenCalledWith(
-      `https://api.example.test/api/v1/responses/${responseId}`,
+      `https://api.example.test/api/v1/events/${eventId}/responses/${responseId}`,
       expect.objectContaining({
         method: 'PATCH',
-        headers: expect.objectContaining({ authorization: `Bearer ${editToken}` }),
+        headers: { 'content-type': 'application/json' },
       }),
     );
   });

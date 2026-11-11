@@ -24,14 +24,15 @@ const responseSchema = z.object({
 
 const finalizationSchema = z.object({
   date: z.iso.date(),
-  startSlot: z.number().int().min(12).max(47),
-  endSlot: z.number().int().min(13).max(48),
+  startSlot: z.number().int().min(12).max(59),
+  endSlot: z.number().int().min(13).max(60),
 }).refine(({ startSlot, endSlot }) => endSlot > startSlot);
 
 const adminEventSchema = z.object({
   id: z.uuid(),
   title: z.string().min(1).max(120),
   description: z.string().max(2000),
+  duration: z.string().max(100),
   organizerEmail: z.email().max(254),
   organizerEmailVerified: z.boolean(),
   notifyOnResponse: z.boolean(),
@@ -43,7 +44,7 @@ const adminEventSchema = z.object({
   candidateSlots: z.array(z.object({
     id: z.uuid(),
     date: z.iso.date(),
-    slotIndex: z.number().int().min(12).max(47),
+    slotIndex: z.number().int().min(12).max(59),
   })),
   responses: z.array(responseSchema),
 });

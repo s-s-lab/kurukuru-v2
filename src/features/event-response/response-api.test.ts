@@ -5,6 +5,7 @@ import {
   getPublicEvent,
   ResponseApiError,
   updateParticipantResponse,
+  updatePublicParticipantResponse,
 } from './response-api';
 
 const eventId = '11111111-1111-4111-8111-111111111111';
@@ -22,6 +23,7 @@ const event = {
   id: eventId,
   title: '11月の定例',
   description: '',
+  duration: '1時間程度',
   status: 'open' as const,
   finalization: null,
   createdAt: '2026-11-01T00:00:00.000Z',
@@ -78,6 +80,18 @@ describe('participant response API', () => {
         'content-type': 'application/json',
       },
     }));
+  });
+
+  it('updates a response from its event page without an authorization header', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ response: publicResponse }));
+    await expect(updatePublicParticipantResponse(eventId, responseId, request, {
+      apiBaseUrl: '/api/v1', fetcher,
+    })).resolves.toEqual({ response: publicResponse });
+    expect(fetcher).toHaveBeenCalledWith(`/api/v1/events/${eventId}/responses/${responseId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    });
   });
 
   it.each([

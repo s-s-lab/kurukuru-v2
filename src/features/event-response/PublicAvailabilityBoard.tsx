@@ -3,7 +3,7 @@ import { MARKS } from '../../domain/availability';
 import { formatSlotStart } from '../../domain/slots';
 import { DAY_SLOT_INDEXES, formatTimelineHeader, uniqueCandidateDates } from '../../domain/timeline';
 
-type Props = { event: PublicEvent };
+type Props = { event: PublicEvent; onEditResponse: (responseId: string) => void };
 
 const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 const symbolByMark = Object.fromEntries(MARKS.map(({ value, symbol }) => [value, symbol])) as Record<AvailabilityMark, string>;
@@ -20,7 +20,7 @@ function tableLabel(date: string) {
   return `${year}年${Number(month)}月${Number(day)}日のみんなの回答`;
 }
 
-export function PublicAvailabilityBoard({ event }: Props) {
+export function PublicAvailabilityBoard({ event, onEditResponse }: Props) {
   const dates = uniqueCandidateDates(event.candidateSlots);
   const slotsByDateAndIndex = new Map(event.candidateSlots.map((slot) => [`${slot.date}:${slot.slotIndex}`, slot]));
 
@@ -42,7 +42,12 @@ export function PublicAvailabilityBoard({ event }: Props) {
             <tbody>{event.responses.map((response) => {
               const answers = new Map(response.availability.map((answer) => [answer.candidateSlotId, answer.mark]));
               return <tr key={response.id}>
-                <th scope="row" className="public-board-name timeline-sticky-column">{response.displayName}</th>
+                <th scope="row" className="public-board-name timeline-sticky-column">
+                  <button type="button" className="public-board-edit-name"
+                    aria-label={`${response.displayName}の回答を編集`}
+                    disabled={event.status === 'closed'}
+                    onClick={() => onEditResponse(response.id)}>{response.displayName}</button>
+                </th>
                 {DAY_SLOT_INDEXES.map((slotIndex) => {
                   const slot = slotsByDateAndIndex.get(`${date}:${slotIndex}`);
                   if (!slot) return <td key={slotIndex} className="public-board-slot-blocked" aria-hidden="true" />;

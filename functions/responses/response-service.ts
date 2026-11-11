@@ -41,5 +41,13 @@ export function createResponseService(
         editTokenHash: hashOpaqueToken(command.editToken),
       });
     },
+
+    async updatePublicResponse(command) {
+      return repository.updatePublicResponse({
+        eventId: command.eventId,
+        responseId: command.responseId,
+        request: responseRequestSchema.parse(command.request),
+      });
+    },
   };
 }

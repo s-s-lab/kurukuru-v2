@@ -15,13 +15,13 @@ type Props = {
   onSubmit: () => void;
   onClose: () => void;
   isSubmitting: boolean;
-  ownsResponse: boolean;
+  isEditing: boolean;
   saveMessage: string;
 };
 
 export function ResponseEditorModal(props: Props) {
   const { event, draft, selectedMark, onSelectedMarkChange, onDraftChange, onPaint,
-    onSubmit, onClose, isSubmitting, ownsResponse, saveMessage } = props;
+    onSubmit, onClose, isSubmitting, isEditing, saveMessage } = props;
   const closeButton = useRef<HTMLButtonElement>(null);
   const invalidName = draft.displayName.trim().length < 1 || draft.displayName.trim().length > 80;
 
@@ -34,7 +34,7 @@ export function ResponseEditorModal(props: Props) {
     return () => document.removeEventListener('keydown', escape);
   }, [isSubmitting, onClose]);
 
-  const title = ownsResponse ? '自分の回答を編集' : '回答を追加';
+  const title = isEditing ? '回答を編集' : '回答を追加';
   return <div className="response-modal-backdrop" onMouseDown={(event_) => {
     if (event_.target === event_.currentTarget && !isSubmitting) onClose();
   }}>
@@ -65,12 +65,12 @@ export function ResponseEditorModal(props: Props) {
           selectedMark={selectedMark} onSelectedMarkChange={onSelectedMarkChange} onPaint={onPaint} />
       </div>
       <footer className="response-modal-footer">
-        <p role="status" aria-live="polite">{saveMessage || (ownsResponse ? '保存済みの回答を編集中です' : '')}</p>
+        <p role="status" aria-live="polite">{saveMessage || (isEditing ? '選択した回答を編集中です' : '')}</p>
         <div>
           <button type="button" className="event-button event-button-secondary" onClick={onClose} disabled={isSubmitting}>キャンセル</button>
           <button type="button" className="event-button event-button-primary" onClick={onSubmit}
             disabled={isSubmitting || invalidName}>
-            {isSubmitting ? '保存中…' : ownsResponse ? '回答を更新' : '回答を保存'}
+            {isSubmitting ? '保存中…' : isEditing ? '回答を更新' : '回答を保存'}
           </button>
         </div>
       </footer>

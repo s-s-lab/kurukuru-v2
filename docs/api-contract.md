@@ -32,6 +32,8 @@
 
 `POST /events/:eventId/responses`は16〜128文字の`Idempotency-Key`を必須とする。
 `PATCH /responses/:responseId`は`Authorization: Bearer <editToken>`を必須とする。
+
+`PATCH /events/:eventId/responses/:responseId`はイベント公開ページからの回答編集に使用し、認証トークンを要求しない。回答IDがイベントIDに属さない場合は404を返す。イベントページへアクセスできる利用者は、表示されている任意の回答を編集できる。
 両方とも以下の完全な回答をJSONで送る。候補枠は対象イベントの全枠を重複なく1回ずつ含める（PATCHも差分ではなく全件）。
 
 ```json

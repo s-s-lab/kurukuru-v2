@@ -6,6 +6,7 @@ export type CreateEventPersistenceInput = {
   event: {
     title: string;
     description: string;
+    duration: string;
     organizerEmail: string;
     adminSecretHash: string;
     notifyOnResponse: boolean;

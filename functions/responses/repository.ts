@@ -2,6 +2,7 @@ export type {
   CreateResponsePersistenceInput,
   ResponseRepository,
   UpdateResponsePersistenceInput,
+  PublicUpdateResponsePersistenceInput,
 } from './service';
 export { IdempotencyConflictError } from '../events/postgres-event-repository';
 

@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 
 import type { AdminEvent } from '../../../functions/admin/service';
 import { formatSlotEnd, formatSlotStart } from '../../domain/slots';
+import { DAY_SLOT_INDEXES, formatTimelineHeader } from '../../domain/timeline';
 import {
   removeCandidateDay,
   toggleCandidateSlot,
@@ -12,7 +13,7 @@ import {
 import { CandidateDateCalendar } from '../event-create/CandidateDateCalendar';
 import { createCandidateDays } from './admin-schedule-model';
 
-const SLOTS = Array.from({ length: 36 }, (_, index) => index + 12);
+const SLOTS = DAY_SLOT_INDEXES;
 
 function formatDate(date: string) {
   const [, month, day] = date.split('-');
@@ -57,7 +58,8 @@ export function AdminCandidateEditor({ event, isMutating, message, currentDate, 
     <div className="admin-candidate-scroll" role="region" tabIndex={0} aria-label="候補日時の編集表スクロール領域">
       <table className="admin-candidate-table" aria-label="候補日時の編集">
         <thead><tr><th scope="col" className="admin-date-column">候補日</th>
-          {SLOTS.map((slot) => <th scope="col" key={slot}>{formatSlotStart(slot)}</th>)}
+          {SLOTS.map((slot) => <th scope="col" key={slot}
+            title={formatSlotStart(slot)}>{formatTimelineHeader(slot)}</th>)}
         </tr></thead>
         <tbody>{days.map((day) => {
           const selected = new Set(day.slotIndexes);
@@ -79,7 +81,7 @@ export function AdminCandidateEditor({ event, isMutating, message, currentDate, 
       </table>
     </div>
     {days.length === 0 ? <p className="event-grid-empty">候補日を1日以上追加してください。</p> : null}
-    <p className="event-grid-help">06:00〜24:00を30分単位で選択できます。表は横へスクロールできます。</p>
+    <p className="event-grid-help">06:00〜翌06:00を30分単位で選択できます。表は横へスクロールできます。</p>
     <p className="event-field-error" role="alert">{error}</p>
     <p className="admin-operation-message" aria-live="polite">{message}</p>
     <button type="button" className="event-button event-button-primary admin-lifecycle-submit"

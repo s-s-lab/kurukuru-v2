@@ -51,6 +51,7 @@ export function createEventService(
         event: {
           title: command.request.title,
           description: command.request.description,
+          duration: command.request.duration,
           organizerEmail: command.request.organizerEmail,
           adminSecretHash,
           notifyOnResponse: command.request.notifyOnResponse,

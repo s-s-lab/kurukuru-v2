@@ -5,6 +5,7 @@ import { createEvent, EventApiError, type CreateEventRequest } from './event-api
 const request: CreateEventRequest = {
   title: '打ち合わせ',
   description: '',
+  duration: '1時間程度',
   organizerEmail: 'organizer@example.com',
   adminPassword: 'password',
   notifyOnResponse: true,
@@ -23,7 +24,7 @@ describe('event creation API client', () => {
       return Response.json({
         event: {
           id: '9bed1489-b31f-4b6d-8dcb-e8d95109f98c',
-          title: '打ち合わせ', description: '', status: 'open', finalization: null,
+          title: '打ち合わせ', description: '', duration: '1時間程度', status: 'open', finalization: null,
           createdAt: '2026-10-29T07:00:00.000Z', updatedAt: '2026-10-29T07:00:00.000Z',
           candidateSlots: [{
             id: '150da5e0-f923-492c-be9b-263bf5af58fc', date: '2026-11-04', slotIndex: 26,
@@ -46,7 +47,7 @@ describe('event creation API client', () => {
       },
     });
     expect(JSON.parse(fetchCalls[0].body as string)).toEqual({
-      title: '打ち合わせ', description: '', organizerEmail: 'organizer@example.com',
+      title: '打ち合わせ', description: '', duration: '1時間程度', organizerEmail: 'organizer@example.com',
       adminPassword: 'password', notifyOnResponse: true,
       candidateSlots: [{ date: '2026-11-04', slotIndexes: [26] }],
     });

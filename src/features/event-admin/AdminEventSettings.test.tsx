@@ -8,6 +8,7 @@ import { AdminEventSettings } from './AdminEventSettings';
 const event: AdminEvent = {
   id: '11111111-1111-4111-8111-111111111111', title: '11月の定例',
   description: '都合のよい日時を教えてください。', organizerEmail: 'owner@example.com',
+  duration: '1時間程度',
   organizerEmailVerified: true, notifyOnResponse: true, status: 'open', finalization: null,
   version: 1, createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-01T00:00:00.000Z',
   candidateSlots: [], responses: [],
@@ -44,18 +45,21 @@ describe('organizer event settings', () => {
     const { props } = renderSettings();
     const title = screen.getByLabelText('イベント名');
     const description = screen.getByLabelText('説明');
+    const duration = screen.getByLabelText('所要時間');
     const organizerEmail = screen.getByLabelText('主催者メールアドレス');
     await user.clear(title);
     await user.type(title, '  更新後の定例  ');
     await user.clear(description);
     await user.type(description, '  新しい説明  ');
+    await user.clear(duration);
+    await user.type(duration, '  90分  ');
     await user.clear(organizerEmail);
     await user.type(organizerEmail, '  NEW-OWNER@Example.COM  ');
     await user.click(screen.getByLabelText('回答が届いたらメールで通知する'));
     await user.click(screen.getByRole('button', { name: '変更を保存' }));
 
     expect(props.onSave).toHaveBeenCalledWith({
-      title: '更新後の定例', description: '新しい説明',
+      title: '更新後の定例', description: '新しい説明', duration: '90分',
       organizerEmail: 'new-owner@example.com', notifyOnResponse: false,
     });
   });

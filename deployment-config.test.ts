@@ -21,6 +21,15 @@ describe('GitHub Pages deployment configuration', () => {
     );
   });
 
+  it('publishes the application when main is updated', () => {
+    const workflow = readFileSync('.github/workflows/pages.yml', 'utf8');
+
+    expect(workflow).toContain('push:');
+    expect(workflow).toContain('branches: [main]');
+    expect(workflow).not.toContain('Replace public site with temporary suspension page');
+    expect(workflow).not.toContain('Disallow: /');
+  });
+
   it('documents the custom domain as an allowed browser origin', () => {
     const exampleEnvironment = readFileSync('.env.example', 'utf8');
 

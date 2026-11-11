@@ -13,7 +13,7 @@ const slotC = '33333333-3333-4333-8333-333333333333';
 
 const event: AdminEvent = {
   id: '44444444-4444-4444-8444-444444444444',
-  title: '定例', description: '', organizerEmail: 'owner@example.com',
+  title: '定例', description: '', duration: '', organizerEmail: 'owner@example.com',
   organizerEmailVerified: true, notifyOnResponse: true, status: 'open',
   finalization: null, version: 1,
   createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-01T00:00:00.000Z',

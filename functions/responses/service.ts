@@ -21,12 +21,19 @@ export type UpdateResponseCommand = {
   request: ResponseRequest;
 };
 
+export type PublicUpdateResponseCommand = {
+  eventId: string;
+  responseId: string;
+  request: ResponseRequest;
+};
+
 export type UpdateResponseResult = { response: PublicResponse };
 export type CreateResponseResult = UpdateResponseResult & { editToken: string };
 
 export interface ResponseService {
   createResponse(command: CreateResponseCommand): Promise<CreateResponseResult>;
   updateResponse(command: UpdateResponseCommand): Promise<UpdateResponseResult>;
+  updatePublicResponse(command: PublicUpdateResponseCommand): Promise<UpdateResponseResult>;
 }
 
 export type CreateResponsePersistenceInput = CreateResponseCommand & {
@@ -39,8 +46,11 @@ export type UpdateResponsePersistenceInput = Omit<UpdateResponseCommand, 'editTo
   editTokenHash: string;
 };
 
+export type PublicUpdateResponsePersistenceInput = PublicUpdateResponseCommand;
+
 // Persistence receives data only; edit tokens and the signing secret stay in the service.
 export interface ResponseRepository {
   createResponse(input: CreateResponsePersistenceInput): Promise<UpdateResponseResult>;
   updateResponse(input: UpdateResponsePersistenceInput): Promise<UpdateResponseResult>;
+  updatePublicResponse(input: PublicUpdateResponsePersistenceInput): Promise<UpdateResponseResult>;
 }

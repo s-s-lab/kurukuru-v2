@@ -1,9 +1,10 @@
 const MIN_SLOT_INDEX = 12;
-const MAX_SLOT_INDEX = 47;
+const MAX_SLOT_INDEX = 59;
 
 function formatMinutes(totalMinutes: number): string {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const minutesInDay = totalMinutes % (24 * 60);
+  const hours = Math.floor(minutesInDay / 60);
+  const minutes = minutesInDay % 60;
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }
 
@@ -14,6 +15,7 @@ export function formatSlotStart(slotIndex: number): string {
 
 export function formatSlotEnd(slotIndex: number): string {
   assertCandidateSlots([slotIndex]);
+  if (slotIndex === 47) return '24:00';
   return formatMinutes((slotIndex + 1) * 30);
 }
 
@@ -30,7 +32,7 @@ export function assertCandidateSlots(slotIndexes: readonly number[]): void {
   );
 
   if (invalid !== undefined) {
-    throw new RangeError('候補時間は06:00〜24:00の30分単位で指定してください。');
+    throw new RangeError('候補時間は06:00〜翌06:00の30分単位で指定してください。');
   }
 }
 

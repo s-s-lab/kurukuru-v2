@@ -24,6 +24,7 @@ const adminEvent = {
   id: eventId,
   title: '11月のプロジェクト定例',
   description: '都合のよい日時を教えてください。',
+  duration: '1時間程度',
   organizerEmail: 'organizer@example.com',
   organizerEmailVerified: true,
   notifyOnResponse: true,
@@ -72,7 +73,7 @@ describe('organizer admin API client', () => {
 
     await getAdminEvent(eventId, options);
     await updateAdminEvent(eventId, {
-      title: '更新後', description: '新しい説明',
+      title: '更新後', description: '新しい説明', duration: '90分',
       organizerEmail: 'organizer@example.com', notifyOnResponse: false,
     }, options);
     await closeAdminEvent(eventId, options);
@@ -86,7 +87,7 @@ describe('organizer admin API client', () => {
         method: 'PATCH',
         headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
         body: JSON.stringify({
-          title: '更新後', description: '新しい説明',
+          title: '更新後', description: '新しい説明', duration: '90分',
           organizerEmail: 'organizer@example.com', notifyOnResponse: false,
         }),
       }],
@@ -203,7 +204,7 @@ describe('organizer admin API client', () => {
     }, { status: 422 });
 
     const error = await updateAdminEvent(eventId, {
-      title: '', description: '', organizerEmail: 'organizer@example.com', notifyOnResponse: true,
+      title: '', description: '', duration: '', organizerEmail: 'organizer@example.com', notifyOnResponse: true,
     }, { apiBaseUrl: '/api/v1', sessionToken: token, fetcher }).catch((value: unknown) => value);
 
     expect(error).toBeInstanceOf(AdminApiError);
@@ -239,7 +240,7 @@ describe('organizer admin API client', () => {
     ['out-of-range slot index', { ...adminEvent, candidateSlots: [{ ...adminEvent.candidateSlots[0], slotIndex: 99 }] }],
     ['invalid update timestamp', { ...adminEvent, updatedAt: 'not-a-timestamp' }],
     ['backwards finalization', { ...adminEvent, finalization: { date: '2026-11-10', startSlot: 20, endSlot: 19 } }],
-    ['out-of-range finalization end', { ...adminEvent, finalization: { date: '2026-11-10', startSlot: 47, endSlot: 49 } }],
+    ['out-of-range finalization end', { ...adminEvent, finalization: { date: '2026-11-10', startSlot: 59, endSlot: 61 } }],
   ])('rejects semantically malformed successful data: %s', async (_label, payload) => {
     const fetcher: typeof fetch = async () => Response.json(payload);
     const error = await getAdminEvent(eventId, {
