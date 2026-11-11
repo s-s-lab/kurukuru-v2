@@ -34,7 +34,7 @@ Functionの実API検証は、`FUNCTION_URL`を設定して`npm run smoke:functio
 
 ## 公開
 
-**公開一時停止中（2026-11-06）**：トントン開発者への許諾確認が完了するまで、一般向けのKurukuruアプリは公開しません。`.github/workflows/pages.yml`の`main` pushによるPages自動デプロイを停止し、手動実行した場合もアプリ本体ではなく公開停止案内のみを配置します。GitHub Pages側で「Unpublish site」を選択すれば現行配信も停止できます。再公開には公開可否確認に加え、ワークフローの公開停止措置を明示的に解除する必要があります。アプリの開発・テスト、Neon development環境の検証は継続します。公開予定ドメインは`https://kurukuru-app.jp`です。
+トントン開発者から許諾を得たうえで、2026-11-11に一般公開を再開しました。最新版は`https://kurukuru-app.jp`で公開し、`main`への更新をGitHub Pagesへ自動デプロイします。
 
 ## ドキュメント
 
