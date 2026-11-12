@@ -523,7 +523,15 @@ export function createApp(config: AppConfig) {
     if (!config.notificationDispatcher) {
       return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
     }
-    const parsed = await parseTriggerDelivery(context.req.raw);
+    let payload: unknown;
+    try {
+      payload = await context.req.json();
+    } catch {
+      return context.json({ code: 'NOT_FOUND', message: '指定されたAPIは見つかりません。', requestId }, 404);
+    }
+    // Neon may provide Request from a different runtime realm. Passing the
+    // already parsed values avoids relying on cross-realm instanceof checks.
+    const parsed = parseTriggerDelivery({ headers: context.req.raw.headers, body: payload });
     if (!parsed.ok || parsed.invocation.type !== 'schedule') {
       return context.json({ code: 'NOT_FOUND', message: '指定されたAPIは見つかりません。', requestId }, 404);
     }

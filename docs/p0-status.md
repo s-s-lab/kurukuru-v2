@@ -29,3 +29,11 @@ P1以降へ進行し、GitHub公開リポジトリ、Neon development環境、Re
 - 送信元は`Kurukuru <no-reply@notify.kurukuru-app.jp>`、Reply-Toなし、受信用メールボックスなしの通知専用構成とする。
 - アプリ側のメール確認・回答通知実装、Resendへのドメイン追加、XServer DNSへの指定レコード登録、Neon Function環境変数の投入まで完了。残る外部作業はDKIM最終確認、通知ワーカーの定期呼び出し、本番疎通確認。
 
+## 2026-11-12 回答通知の本番改善
+
+- 回答保存後の通知配送を`waitUntil`で即時実行し、Resend呼び出しへ10秒のタイムアウトを追加
+- `notification-drain` Triggerをdevelopmentブランチで有効化し、1分ごとに未送信通知を再試行
+- Trigger本文をランタイムのRequestコンテキストに依存せず検証するよう修正
+- Function ZIP単体で起動できるよう、`pg`をESMバンドルへ内包し、CommonJS依存向けの`createRequire` bannerを追加
+- 滞留していた回答通知4件がすべて`sent`へ移行し、Resendでも4件すべて`delivered`を確認
+
