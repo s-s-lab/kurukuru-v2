@@ -72,6 +72,37 @@ describe('通知ワーカーAPI', () => {
     expect(notificationDispatcher.drain).toHaveBeenCalledWith(10);
   });
 
+  it('Neonランタイムと異なるRequestコンテキストでもTrigger本文を検証できる', async () => {
+    const notificationDispatcher: NotificationDispatcher = {
+      drain: vi.fn(async () => ({ processed: 1, sent: 1, failed: 0 })),
+    };
+    const app = createApp({ allowedOrigins: [], notificationDispatcher });
+    const NativeRequest = globalThis.Request;
+    const request = new NativeRequest('http://localhost/api/v1/internal/notifications/drain-trigger', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-neon-trigger-invocation-id': 'scheduled-invocation-cross-realm',
+      },
+      body: JSON.stringify({
+        version: 1,
+        invocation_id: 'scheduled-invocation-cross-realm',
+        trigger: { type: 'schedule', id: 'trigger-1', name: 'notification-drain' },
+        data: { scheduled_at: '2026-11-12T03:00:00.000Z' },
+      }),
+    });
+
+    class OtherRealmRequest extends NativeRequest {}
+    vi.stubGlobal('Request', OtherRealmRequest);
+    try {
+      const response = await app.fetch(request);
+      expect(response.status).toBe(200);
+      expect(notificationDispatcher.drain).toHaveBeenCalledWith(10);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('通常のHTTPリクエストではスケジュール処理を起動できない', async () => {
     const notificationDispatcher: NotificationDispatcher = {
       drain: vi.fn(async () => ({ processed: 0, sent: 0, failed: 0 })),
