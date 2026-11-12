@@ -29,7 +29,8 @@ describe('Kurukuruの入口', () => {
     expect(screen.getByText('Kurukuru — 予定を、時間で合わせる。')).toBeInTheDocument();
     expect(screen.queryByText(/Kurukuru v2/)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'ご利用にあたって' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'ネクストトントン' }))
+    expect(screen.getByText(/個人利用を目的に、スケジュール調整サービス/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'tonntonn' }))
       .toHaveAttribute('href', 'https://nextonton.inotai.net/');
     expect(screen.getByText(/収益は一切発生しません/)).toBeInTheDocument();
     expect(screen.getByText(/セキュリティ上のトラブルについても一切責任を負いません/)).toBeInTheDocument();
