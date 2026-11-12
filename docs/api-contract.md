@@ -20,6 +20,7 @@
 | POST | `/events/:eventId/email-verifications` | 管理セッション・回数制限 | 認証メール送信・再送 |
 | GET | `/email-verifications/:token` | 公開・高強度トークン | 主催者メール認証 |
 | POST | `/internal/notifications/drain` | ワーカーBearer秘密値 | 回答通知を最大10件配送 |
+| POST | `/internal/notifications/drain-trigger` | Neon Function Trigger | 回答通知を最大10件配送 |
 
 ## 共通ルール
 
@@ -160,7 +161,11 @@ FUNCTION_URL=https://br-icy-dew-aowwun6d-kurukuruapi.compute.c-2.ap-southeast-1.
 
 Resendは`Kurukuru <no-reply@notify.kurukuru-app.jp>`から送信し、Reply-Toは設定しない。メール設定が不足する場合、既存APIは起動したままメール関連ルートだけを`503 SERVICE_UNAVAILABLE`とする。配信事業者の失敗本文は公開せず、確認メールの配信失敗は`502 EMAIL_DELIVERY_FAILED`へ固定する。
 
-通知は回答保存トランザクションで作成済みのアウトボックスを`POST /internal/notifications/drain`が最大10件ずつ処理する。`Authorization: Bearer <KURUKURU_NOTIFICATION_WORKER_SECRET>`が一致しない場合は存在を隠す`404 NOT_FOUND`、構成不足は`503 SERVICE_UNAVAILABLE`。claimは`FOR UPDATE SKIP LOCKED`を使用し、15分以上`sending`の行を回収する。失敗は1・2・4分…の指数バックオフ（最大6時間）で再試行し、Resendへアウトボックスの冪等キーを渡す。
+通知は回答保存トランザクションでアウトボックスへ登録し、回答APIの成功応答を待たせない`waitUntil`処理で直ちに配送を開始する。Resendへのリクエストは10秒で打ち切り、失敗時は回答保存を取り消さず再試行対象へ戻す。
+
+取りこぼしと再試行は、Neon Function Triggerから`POST /internal/notifications/drain-trigger`を`* * * * *`（UTC、1分ごと）で呼び出して回収する。ルートはNeonが付与する`x-neon-trigger-invocation-id`と本文の`invocation_id`の一致を検証し、通常の外部HTTPリクエストでは起動できない。手動運用用の`POST /internal/notifications/drain`は引き続き`Authorization: Bearer <KURUKURU_NOTIFICATION_WORKER_SECRET>`を要求し、不一致時は存在を隠す`404 NOT_FOUND`、構成不足は`503 SERVICE_UNAVAILABLE`を返す。
+
+両経路とも最大10件を`FOR UPDATE SKIP LOCKED`でclaimし、15分以上`sending`の行を回収する。失敗は1・2・4分…の指数バックオフ（最大6時間）で再試行し、Resendへアウトボックスの冪等キーを渡す。デプロイ後はFunction Triggerが有効で次回実行時刻を持つこと、`notification_outbox`の準備済み件数が減ること、Resendで回答通知が配信済みになることを確認する。
 
 Function環境には次を設定する（すべて`VITE_`接頭辞なし）。
 

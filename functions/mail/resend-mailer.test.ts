@@ -40,6 +40,7 @@ describe('ResendMailer', () => {
         html: '<p>本文</p>',
         text: '本文',
       }),
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -81,5 +82,25 @@ describe('ResendMailer', () => {
         name: 'MailDeliveryError', category: 'network-failure',
       }),
     );
+  });
+
+  it('providerが応答しない場合はタイムアウトして再試行可能な失敗にする', async () => {
+    const fetcher = vi.fn<typeof fetch>((_url, init) => new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      if (!signal) return;
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+    const mailer = new ResendMailer({
+      apiKey: 're_secret', from: 'from@example.com', fetcher, timeoutMs: 5,
+    });
+
+    const outcome = await Promise.race([
+      mailer.send(message).then(() => 'resolved', (error: unknown) => error),
+      new Promise((resolve) => setTimeout(() => resolve('test-timed-out'), 100)),
+    ]);
+
+    expect(outcome).toEqual(expect.objectContaining<Partial<MailDeliveryError>>({
+      name: 'MailDeliveryError', category: 'network-failure',
+    }));
   });
 });

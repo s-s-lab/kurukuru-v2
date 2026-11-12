@@ -19,11 +19,13 @@ export class ResendMailer implements MailSender {
   private readonly apiKey: string;
   private readonly from: string;
   private readonly fetcher: typeof fetch;
+  private readonly timeoutMs: number;
 
-  constructor(options: { apiKey: string; from: string; fetcher?: typeof fetch }) {
+  constructor(options: { apiKey: string; from: string; fetcher?: typeof fetch; timeoutMs?: number }) {
     this.apiKey = options.apiKey;
     this.from = options.from;
     this.fetcher = options.fetcher ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? 10_000;
   }
 
   async send(message: MailMessage): Promise<{ providerMessageId: string }> {
@@ -43,6 +45,7 @@ export class ResendMailer implements MailSender {
           html: message.html,
           text: message.text,
         }),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch {
       throw new MailDeliveryError('network-failure');
