@@ -47,4 +47,48 @@ describe('通知ワーカーAPI', () => {
     });
     expect(response.status).toBe(503);
   });
+
+  it('Neonのスケジュール実行だけが送信待ち通知を処理できる', async () => {
+    const notificationDispatcher: NotificationDispatcher = {
+      drain: vi.fn(async () => ({ processed: 1, sent: 1, failed: 0 })),
+    };
+    const app = createApp({ allowedOrigins: [], notificationDispatcher });
+    const response = await app.request('/api/v1/internal/notifications/drain-trigger', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-neon-trigger-invocation-id': 'scheduled-invocation-1',
+      },
+      body: JSON.stringify({
+        version: 1,
+        invocation_id: 'scheduled-invocation-1',
+        trigger: { type: 'schedule', id: 'trigger-1', name: 'notification-drain' },
+        data: { scheduled_at: '2026-11-12T03:00:00.000Z' },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ processed: 1, sent: 1, failed: 0 });
+    expect(notificationDispatcher.drain).toHaveBeenCalledWith(10);
+  });
+
+  it('通常のHTTPリクエストではスケジュール処理を起動できない', async () => {
+    const notificationDispatcher: NotificationDispatcher = {
+      drain: vi.fn(async () => ({ processed: 0, sent: 0, failed: 0 })),
+    };
+    const app = createApp({ allowedOrigins: [], notificationDispatcher });
+    const response = await app.request('/api/v1/internal/notifications/drain-trigger', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        version: 1,
+        invocation_id: 'forged-invocation',
+        trigger: { type: 'schedule', id: 'trigger-1', name: 'notification-drain' },
+        data: { scheduled_at: '2026-11-12T03:00:00.000Z' },
+      }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(notificationDispatcher.drain).not.toHaveBeenCalled();
+  });
 });

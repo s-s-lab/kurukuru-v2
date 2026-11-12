@@ -1,4 +1,4 @@
-import { Check, Copy, ShieldCheck, TriangleAlert, Users } from 'lucide-react';
+import { Check, Copy, ExternalLink, ShieldCheck, TriangleAlert, Users } from 'lucide-react';
 import { useState } from 'react';
 
 type EventCreationSuccessProps = {
@@ -38,6 +38,9 @@ export function EventCreationSuccess({ participantUrl, organizerUrl, copyText }:
           <button type="button" className="event-button event-button-secondary" onClick={() => { void copy(label, url); }}>
             <Copy size={16} aria-hidden="true" />URLをコピー
           </button>
+          {id === 'participant-url' ? <a className="event-button event-button-secondary" href={url}>
+            <ExternalLink size={16} aria-hidden="true" />回答ボードを開く
+          </a> : null}
         </div>
       </div>)}
       <div className="event-save-warning">

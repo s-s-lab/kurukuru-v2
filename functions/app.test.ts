@@ -392,6 +392,71 @@ async function expectResponseError(
 }
 
 describe('回答API', () => {
+  it('回答保存後は通知配送の完了を待たずに成功を返す', async () => {
+    let finishDrain!: () => void;
+    const notificationDispatcher = {
+      drain: vi.fn(() => new Promise<{ processed: number; sent: number; failed: number }>((resolve) => {
+        finishDrain = () => resolve({ processed: 1, sent: 1, failed: 0 });
+      })),
+    };
+    const app = createApp({
+      allowedOrigins: [],
+      responseService: responseServiceFake(),
+      notificationDispatcher,
+    });
+    const response = await app.request(`/api/v1/events/${eventId}/responses`, {
+      method: 'POST', headers: responseHeaders(), body: JSON.stringify(responseRequest),
+    });
+
+    expect(response.status).toBe(201);
+    expect(notificationDispatcher.drain).toHaveBeenCalledWith(10);
+    finishDrain();
+  });
+
+  it('即時配送が失敗しても保存済み回答は成功として返す', async () => {
+    const notificationDispatcher = {
+      drain: vi.fn(async () => { throw new Error('temporary worker failure'); }),
+    };
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const app = createApp({
+        allowedOrigins: [],
+        responseService: responseServiceFake(),
+        notificationDispatcher,
+      });
+      const response = await app.request(`/api/v1/events/${eventId}/responses`, {
+        method: 'POST', headers: responseHeaders(), body: JSON.stringify(responseRequest),
+      });
+
+      expect(response.status).toBe(201);
+      expect(notificationDispatcher.drain).toHaveBeenCalledWith(10);
+      expect(errorLog).toHaveBeenCalledTimes(1);
+    } finally {
+      errorLog.mockRestore();
+    }
+  });
+
+  it.each([
+    ['編集トークン', `/api/v1/responses/${responseId}`, responseHeaders()],
+    ['回答ボード', `/api/v1/events/${eventId}/responses/${responseId}`,
+      { 'content-type': 'application/json', 'x-request-id': 'response-request-id' }],
+  ])('%sからの回答編集直後に送信待ち通知を配送する', async (_label, path, headers) => {
+    const notificationDispatcher = {
+      drain: vi.fn(async () => ({ processed: 1, sent: 1, failed: 0 })),
+    };
+    const app = createApp({
+      allowedOrigins: [],
+      responseService: responseServiceFake(),
+      notificationDispatcher,
+    });
+    const response = await app.request(path, {
+      method: 'PATCH', headers, body: JSON.stringify(responseRequest),
+    });
+
+    expect(response.status).toBe(200);
+    expect(notificationDispatcher.drain).toHaveBeenCalledWith(10);
+  });
+
   it('POSTは正規化したIDと入力を渡し、再送時も201と編集トークンを返す', async () => {
     const responseService = responseServiceFake();
     const app = createApp({ allowedOrigins: [], responseService });

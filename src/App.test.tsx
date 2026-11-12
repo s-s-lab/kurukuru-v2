@@ -29,11 +29,14 @@ describe('Kurukuruの入口', () => {
     expect(screen.getByText('Kurukuru — 予定を、時間で合わせる。')).toBeInTheDocument();
     expect(screen.queryByText(/Kurukuru v2/)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'ご利用にあたって' })).toBeInTheDocument();
-    expect(screen.getByText(/個人利用を目的に、スケジュール調整サービス/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'tonntonn' }))
-      .toHaveAttribute('href', 'https://nextonton.inotai.net/');
+    expect(screen.getByText(/個人利用を目的に、スケジュール調整ツール/)).toBeInTheDocument();
+    expect(screen.getByText(/トントンの開発元に対して公開の承諾を得たうえで公開しています/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'トントン' }))
+      .toHaveAttribute('href', 'https://tonton.amaneku.com/addschedule.php');
     expect(screen.getByText(/収益は一切発生しません/)).toBeInTheDocument();
     expect(screen.getByText(/セキュリティ上のトラブルについても一切責任を負いません/)).toBeInTheDocument();
+    expect(screen.getByText(/トントン後継サービス「Nextonton」は、本サービスとは異なる第三者が独立して運用するサービス/)).toBeInTheDocument();
+    expect(screen.getByText(/本サービスとは一切関わりありません/)).toBeInTheDocument();
   });
 
   it('同じブラウザで作成したイベント履歴から回答ボードと管理画面へ移動できる', () => {

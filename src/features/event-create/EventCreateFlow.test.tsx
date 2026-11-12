@@ -146,6 +146,8 @@ describe('イベント作成の一画面フロー', () => {
       .toHaveValue('https://example.test/kurukuru-v2/#/events/created-event');
     expect(screen.getByRole('textbox', { name: '主催者用URL' }))
       .toHaveValue('https://example.test/kurukuru-v2/#/events/created-event/admin');
+    expect(screen.getByRole('link', { name: '回答ボードを開く' }))
+      .toHaveAttribute('href', 'https://example.test/kurukuru-v2/#/events/created-event');
     await user.click(within(screen.getByRole('group', { name: '参加者用URL' }))
       .getByRole('button', { name: 'URLをコピー' }));
     expect(copyText).toHaveBeenCalledWith('https://example.test/kurukuru-v2/#/events/created-event');

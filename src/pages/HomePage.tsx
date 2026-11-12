@@ -31,10 +31,13 @@ export function HomePage() {
       <CreatedEventHistory items={history} />
       <section className="service-notice" aria-labelledby="service-notice-heading">
         <h2 id="service-notice-heading">ご利用にあたって</h2>
-        <p>本サービスは、個人利用を目的に、スケジュール調整サービス「<a href="https://nextonton.inotai.net/"
-          target="_blank" rel="noreferrer">tonntonn</a>」を参考に開発されたものです。</p>
-        <p>広告なし・無料で運営しており、収益は一切発生しません。</p>
-        <p>また、セキュリティ上のトラブルについても一切責任を負いません。</p>
+        <ul>
+          <li>個人利用を目的に、スケジュール調整ツール「<strong><a href="https://tonton.amaneku.com/addschedule.php"
+            target="_blank" rel="noreferrer">トントン</a></strong>」を参考に開発し、トントンの開発元に対して公開の承諾を得たうえで公開しています。</li>
+          <li>広告なし・無料で運営しており、収益は一切発生しません。</li>
+          <li>セキュリティ上のトラブルについても一切責任を負いません。</li>
+          <li>トントン後継サービス「Nextonton」は、本サービスとは異なる第三者が独立して運用するサービスで、本サービスとは一切関わりありません。</li>
+        </ul>
       </section>
     </main>
   );

@@ -1,4 +1,6 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { waitUntil } from '@neon/functions';
+import { parseTriggerDelivery } from '@neon/functions/triggers';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 
@@ -307,6 +309,15 @@ export function createApp(config: AppConfig) {
     return { request: parsed.data };
   }
 
+  async function dispatchPendingNotifications() {
+    if (!config.notificationDispatcher) return;
+    try {
+      await config.notificationDispatcher.drain(10);
+    } catch (error) {
+      console.error('Failed to dispatch pending response notifications.', error);
+    }
+  }
+
   app.post('/api/v1/events/:eventId/responses', async (context) => {
     const requestId = context.get('requestId');
     const idempotencyKey = context.req.header('idempotency-key')?.trim();
@@ -335,6 +346,7 @@ export function createApp(config: AppConfig) {
       idempotencyKey,
       request: parsed.request,
     });
+    waitUntil(dispatchPendingNotifications());
     return context.json(result, 201);
   });
 
@@ -359,6 +371,7 @@ export function createApp(config: AppConfig) {
       editToken,
       request: parsed.request,
     });
+    waitUntil(dispatchPendingNotifications());
     return context.json(result, 200);
   });
 
@@ -385,6 +398,7 @@ export function createApp(config: AppConfig) {
       responseId,
       request: parsed.request,
     });
+    waitUntil(dispatchPendingNotifications());
     return context.json(result, 200);
   });
 
@@ -498,6 +512,19 @@ export function createApp(config: AppConfig) {
     }
     const suppliedSecret = extractBearerToken(context.req.header('authorization'));
     if (!secretsMatch(suppliedSecret, config.notificationWorkerSecret)) {
+      return context.json({ code: 'NOT_FOUND', message: '指定されたAPIは見つかりません。', requestId }, 404);
+    }
+    return context.json(await config.notificationDispatcher.drain(10));
+  });
+
+  app.post('/api/v1/internal/notifications/drain-trigger', async (context) => {
+    preventAdminResponseCaching(context);
+    const requestId = context.get('requestId');
+    if (!config.notificationDispatcher) {
+      return context.json({ code: 'SERVICE_UNAVAILABLE', message: '現在この機能を利用できません。', requestId }, 503);
+    }
+    const parsed = await parseTriggerDelivery(context.req.raw);
+    if (!parsed.ok || parsed.invocation.type !== 'schedule') {
       return context.json({ code: 'NOT_FOUND', message: '指定されたAPIは見つかりません。', requestId }, 404);
     }
     return context.json(await config.notificationDispatcher.drain(10));

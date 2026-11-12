@@ -737,7 +737,8 @@ a { color: inherit; }
 .compact-preview-table > * { min-height: 38px; }
 .service-notice { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fbfdfe; font-size: 12px; line-height: 1.65; }
 .service-notice h2 { margin: 0 0 5px; color: var(--navy); font-size: 14px; }
-.service-notice p { margin: 2px 0; }
+.service-notice ul { margin: 0; padding-left: 1.4em; }
+.service-notice li { margin: 2px 0; }
 .service-notice a { color: var(--teal-dark); font-weight: 700; text-underline-offset: 2px; }
 .created-event-history { margin-top: 16px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
 .created-event-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 12px; background: var(--aqua); }
