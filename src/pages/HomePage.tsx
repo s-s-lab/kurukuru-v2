@@ -31,8 +31,8 @@ export function HomePage() {
       <CreatedEventHistory items={history} />
       <section className="service-notice" aria-labelledby="service-notice-heading">
         <h2 id="service-notice-heading">ご利用にあたって</h2>
-        <p>本サービスは、個人利用を目的に、日程調整サービス「<a href="https://nextonton.inotai.net/"
-          target="_blank" rel="noreferrer">ネクストトントン</a>」を参考に開発されたものです。</p>
+        <p>本サービスは、個人利用を目的に、スケジュール調整サービス「<a href="https://nextonton.inotai.net/"
+          target="_blank" rel="noreferrer">tonntonn</a>」を参考に開発されたものです。</p>
         <p>広告なし・無料で運営しており、収益は一切発生しません。</p>
         <p>また、セキュリティ上のトラブルについても一切責任を負いません。</p>
       </section>
