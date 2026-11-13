@@ -324,6 +324,7 @@ a { color: inherit; }
 .participant-title-row strong.is-closed { color: #8e2e38; background: #fde8ea; }
 .participant-actions { flex: 0 0 auto; display: flex; gap: 8px; }
 .participant-actions .event-button { min-width: 0; }
+.participant-actions a { text-decoration: none; }
 .participant-finalization-inline { display: flex; align-items: center; gap: 12px; padding-block: 12px; color: var(--teal-dark); background: var(--aqua); }
 .participant-board-workspace { padding-block: 22px 12px; }
 .public-board { min-width: 0; }
@@ -424,7 +425,7 @@ a { color: inherit; }
 .response-slot-ng { color: #d43a45; background: #fde6e8; }
 .response-slot-blocked { background: #fbfdfe; }
 .response-grid-section :is(button, [tabindex]):focus-visible,
-.participant-page :is(button, input, textarea):focus-visible { position: relative; z-index: 4; outline: 3px solid #37bbb5; outline-offset: 2px; }
+.participant-page :is(a, button, input, textarea):focus-visible { position: relative; z-index: 4; outline: 3px solid #37bbb5; outline-offset: 2px; }
 .participant-save-message { min-height: 24px; margin: 14px 0 0; color: var(--muted); font-size: 13px; }
 .participant-save-bar { position: sticky; bottom: 0; z-index: 20; border-top: 1px solid #dbe8ed; background: rgba(255,255,255,.97); box-shadow: 0 -8px 24px rgba(15,43,79,.06); }
 .participant-save-bar .shell { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
@@ -447,8 +448,9 @@ a { color: inherit; }
   .participant-summary-compact { display: grid; padding-block: 18px 14px; }
   .participant-summary-compact h1 { margin-top: 8px; font-size: 27px; }
   .participant-summary-compact p { display: block; }
-  .participant-actions { width: 100%; }
-  .participant-actions .event-button { flex: 1; padding-inline: 10px; }
+  .participant-actions { width: 100%; gap: 4px; }
+  .participant-actions .event-button { flex: 1; padding-inline: 4px; font-size: 12px; white-space: nowrap; }
+  .participant-actions svg { display: none; }
   .public-board-table .public-board-name { min-width: 104px; width: 104px; padding-inline: 9px; }
   .public-comments { grid-template-columns: 1fr; }
   .public-comments ul { grid-template-columns: 1fr; }
