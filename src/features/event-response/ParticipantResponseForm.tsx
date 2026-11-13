@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { CalendarDays, Share2 } from 'lucide-react';
+import { CalendarDays, Settings2, Share2 } from 'lucide-react';
 
 import type { AvailabilityMark, PublicEvent } from '../../../functions/events/service';
 import type { ResponseDraft } from './response-model';
@@ -9,6 +9,7 @@ import { ResponseEditorModal } from './ResponseEditorModal';
 type Props = {
   event: PublicEvent;
   draft: ResponseDraft;
+  organizerUrl?: string;
   selectedMark: AvailabilityMark;
   onSelectedMarkChange: (mark: AvailabilityMark) => void;
   onDraftChange: (field: 'displayName' | 'comment', value: string) => void;
@@ -35,7 +36,7 @@ function dateRange(event: PublicEvent) {
 }
 
 export function ParticipantResponseForm(props: Props) {
-  const { event, onShare, editorOpen, isEditing, onOpenNew, onEditResponse,
+  const { event, organizerUrl, onShare, editorOpen, isEditing, onOpenNew, onEditResponse,
     onCloseEditor, saveMessage } = props;
   const openButton = useRef<HTMLButtonElement>(null);
   const closed = event.status === 'closed';
@@ -59,6 +60,9 @@ export function ParticipantResponseForm(props: Props) {
         <button type="button" className="event-button event-button-secondary" onClick={onShare}>
           <Share2 size={17} aria-hidden="true" />共有
         </button>
+        {organizerUrl ? <a className="event-button event-button-secondary" href={organizerUrl}>
+          <Settings2 size={17} aria-hidden="true" />候補日時管理
+        </a> : null}
         <button ref={openButton} type="button" className="event-button event-button-primary"
           disabled={closed} onClick={onOpenNew}>
           回答を追加

@@ -42,6 +42,39 @@ describe('participant event page', () => {
   beforeEach(() => localStorage.clear());
   afterEach(cleanup);
 
+  it('作成したブラウザでは回答ボードから候補日時管理へ移動できる', async () => {
+    localStorage.setItem('kurukuru:created-events', JSON.stringify([
+      {
+        eventId: '44444444-4444-4444-8444-444444444444',
+        title: '別のイベント',
+        createdAt: event.createdAt,
+        participantUrl: 'https://example.test/#/events/44444444-4444-4444-8444-444444444444',
+        organizerUrl: 'https://example.test/#/events/44444444-4444-4444-8444-444444444444/admin',
+      },
+      {
+        eventId,
+        title: event.title,
+        createdAt: event.createdAt,
+        participantUrl: `https://example.test/#/events/${eventId}`,
+        organizerUrl: `https://example.test/#/events/${eventId}/admin`,
+      },
+    ]));
+    const fetcher: typeof fetch = async () => Response.json(event);
+    renderPage(fetcher);
+
+    expect(await screen.findByRole('heading', { name: event.title })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '候補日時管理' }))
+      .toHaveAttribute('href', `https://example.test/#/events/${eventId}/admin`);
+  });
+
+  it('共有された回答ボードでは候補日時管理を表示しない', async () => {
+    const fetcher: typeof fetch = async () => Response.json(event);
+    renderPage(fetcher);
+
+    expect(await screen.findByRole('heading', { name: event.title })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '候補日時管理' })).not.toBeInTheDocument();
+  });
+
   it('loads an event and creates a response with an idempotency key', async () => {
     const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
     const fetcher: typeof fetch = async (input, init) => {
