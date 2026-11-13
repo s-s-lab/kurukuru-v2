@@ -748,12 +748,18 @@ a { color: inherit; }
 .created-event-history-heading span { color: var(--muted); font-size: 11px; }
 .created-event-history ul { margin: 0; padding: 0; list-style: none; }
 .created-event-history li { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 7px 12px; border-top: 1px solid var(--line); }
-.created-event-history li > div { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.created-event-history li > div:not(.created-event-history-actions) { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .created-event-history li strong { overflow-wrap: anywhere; }
 .created-event-history li small { flex: 0 0 auto; color: var(--muted); }
 .created-event-history nav { flex: 0 0 auto; display: flex; gap: 6px; }
 .created-event-history a { min-height: 34px; display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid #a8bfce; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 700; }
 .created-event-history a:hover { background: var(--aqua); }
+.created-event-history-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.created-event-history-remove { min-height: 36px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: #fff; font-size: 12px; cursor: pointer; }
+.created-event-history-remove:hover { color: var(--navy); background: var(--aqua); }
+.created-event-history :is(a, button):focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+.created-event-history-status { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+.created-event-history-status:empty { margin: 0; }
 
 .participant-summary-compact { gap: 18px; padding-block: 14px 10px; }
 .participant-summary-compact h1 { margin: 3px 0; font-size: clamp(23px, 2.5vw, 31px); }
@@ -857,6 +863,8 @@ a { color: inherit; }
   .compact-home-preview { margin-top: 12px; overflow-x: auto; }
   .compact-preview-head, .compact-preview-table { min-width: 600px; }
   .created-event-history li { align-items: stretch; display: grid; gap: 7px; }
+  .created-event-history-actions { display: grid; gap: 6px; }
+  .created-event-history-remove { justify-self: end; }
   .created-event-history nav { display: grid; grid-template-columns: 1fr 1fr; }
   .created-event-history a { justify-content: center; }
   .participant-summary-compact { padding-block: 10px 8px; }

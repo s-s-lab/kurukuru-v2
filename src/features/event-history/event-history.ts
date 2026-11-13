@@ -16,12 +16,31 @@ function isHistoryItem(value: unknown): value is CreatedEventHistoryItem {
     .every((key) => typeof item[key] === 'string');
 }
 
-export function readCreatedEventHistory(): CreatedEventHistoryItem[] {
+function parseHistory(stored: string | null): CreatedEventHistoryItem[] {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
+    const parsed: unknown = JSON.parse(stored ?? '[]');
     return Array.isArray(parsed) ? parsed.filter(isHistoryItem).slice(0, HISTORY_LIMIT) : [];
   } catch {
     return [];
+  }
+}
+
+export function readCreatedEventHistory(): CreatedEventHistoryItem[] {
+  try {
+    return parseHistory(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return [];
+  }
+}
+
+export function removeCreatedEventHistory(eventId: string): CreatedEventHistoryItem[] | null {
+  try {
+    const history = parseHistory(localStorage.getItem(STORAGE_KEY));
+    const remaining = history.filter((item) => item.eventId !== eventId);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+    return remaining;
+  } catch {
+    return null;
   }
 }
 

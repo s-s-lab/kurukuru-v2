@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { Hand, Pencil } from 'lucide-react';
 
+import { measurePointerPath, paintPointerPath, type PointerPathGeometry, type PointerPoint } from '../../lib/paint-pointer-path';
 import type { AvailabilityMark, PublicEvent } from '../../../functions/events/service';
 import { MARKS, type AvailabilityMap } from '../../domain/availability';
 import { formatSlotEnd, formatSlotStart } from '../../domain/slots';
@@ -15,7 +16,7 @@ type Props = {
   onPaint: (slotIds: string[], mark: AvailabilityMark) => void;
 };
 
-type Gesture = { pointerId: number; visited: Set<string> };
+type Gesture = { pointerId: number; visited: Set<string>; previous: PointerPoint; geometry: PointerPathGeometry };
 const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
 function formatDate(date: string) {
@@ -47,7 +48,9 @@ export function AvailabilityResponseGrid({ event, availability, selectedMark,
     if (mode !== 'paint' || event_.button !== 0) return;
     const cell = (event_.target as HTMLElement).closest<HTMLElement>('[data-slot-id]');
     if (!cell) return;
-    const active = { pointerId: event_.pointerId, visited: new Set<string>() };
+    const active = { pointerId: event_.pointerId, visited: new Set<string>(),
+      previous: { clientX: event_.clientX, clientY: event_.clientY },
+      geometry: measurePointerPath(event_.currentTarget, '[data-slot-id]') };
     gesture.current = active;
     event_.currentTarget.setPointerCapture?.(event_.pointerId);
     paintCell(cell, active);
@@ -56,15 +59,15 @@ export function AvailabilityResponseGrid({ event, availability, selectedMark,
   function continuePaint(event_: PointerEvent<HTMLDivElement>) {
     const active = gesture.current;
     if (!active || active.pointerId !== event_.pointerId) return;
-    const hit = typeof document.elementFromPoint === 'function'
-      ? document.elementFromPoint(event_.clientX, event_.clientY)
-      : event_.target as Element;
-    const cell = hit?.closest<HTMLElement>('[data-slot-id]');
-    if (cell && event_.currentTarget.contains(cell)) paintCell(cell, active);
+    const next = { clientX: event_.clientX, clientY: event_.clientY };
+    paintPointerPath(event_.currentTarget, '[data-slot-id]', active.geometry, active.previous, next,
+      (cell) => paintCell(cell, active), event_.target);
+    active.previous = next;
   }
 
   function endPaint(event_: PointerEvent<HTMLDivElement>) {
     if (gesture.current?.pointerId !== event_.pointerId) return;
+    if (event_.type === 'pointerup') continuePaint(event_);
     gesture.current = null;
     if (event_.currentTarget.hasPointerCapture?.(event_.pointerId)) event_.currentTarget.releasePointerCapture(event_.pointerId);
   }
