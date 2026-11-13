@@ -18,6 +18,9 @@ type CandidateTimeStepProps = {
   days: CandidateDayDraft[];
   currentDate: string;
   errors: FieldErrors;
+  heading?: string;
+  description?: string;
+  disabled?: boolean;
   onToggleDate: (date: string) => void;
   onRemoveDate: (date: string) => void;
   onApplyRange: (startSlot: number, endSlot: number) => void;
@@ -30,7 +33,8 @@ type CandidateTimeStepProps = {
 
 type PaintGesture = { pointerId: number; selected: boolean; visited: Set<string> };
 
-export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onRemoveDate,
+export function CandidateTimeStep({ days, currentDate, errors, heading = '候補日時を選択してください',
+  description = '参加できる日と時間を、30分単位で選びます。', disabled = false, onToggleDate, onRemoveDate,
   onApplyRange, onClearAllSlots, onPaintSlot, onToggleSlot, onBack, onNext }: CandidateTimeStepProps) {
   const [interactionMode, setInteractionMode] = useState<'paint' | 'move'>('paint');
   const [rangeStart, setRangeStart] = useState(18);
@@ -48,7 +52,7 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
   }
 
   function startPaint(event: PointerEvent<HTMLDivElement>) {
-    if (interactionMode !== 'paint' || event.button !== 0) return;
+    if (disabled || interactionMode !== 'paint' || event.button !== 0) return;
     const cell = (event.target as HTMLElement).closest<HTMLElement>('[data-slot]');
     if (!cell) return;
     const active = { pointerId: event.pointerId, selected: cell.getAttribute('aria-pressed') !== 'true', visited: new Set<string>() };
@@ -58,6 +62,7 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
   }
 
   function continuePaint(event: PointerEvent<HTMLDivElement>) {
+    if (disabled) return;
     const active = gesture.current;
     if (!active || active.pointerId !== event.pointerId) return;
     // Pointer capture retargets events to the scroll area; hit-test the actual cell.
@@ -76,12 +81,12 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
   }
 
   return (
-    <section aria-labelledby="candidate-heading">
+    <section aria-labelledby="candidate-heading" aria-busy={disabled || undefined}>
       <div className="event-step-heading">
-        <h2 id="candidate-heading" tabIndex={-1}>候補日時を選択してください</h2>
-        <p>参加できる日と時間を、30分単位で選びます。</p>
+        <h2 id="candidate-heading" tabIndex={-1}>{heading}</h2>
+        <p>{description}</p>
       </div>
-      <CandidateDateCalendar days={days} currentDate={currentDate} onToggleDate={onToggleDate} />
+      <CandidateDateCalendar days={days} currentDate={currentDate} disabled={disabled} onToggleDate={onToggleDate} />
       {errors.date ? <p className="event-field-error candidate-calendar-error" id="candidate-date-error">{errors.date}</p> : null}
       <section className="event-range-picker" aria-labelledby="event-range-heading">
         <div>
@@ -90,7 +95,7 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
         </div>
         <div className="event-range-controls">
           <label>開始時刻
-            <select value={rangeStart} onChange={(event) => {
+            <select value={rangeStart} disabled={disabled} onChange={(event) => {
               const nextStart = Number(event.target.value);
               setRangeStart(nextStart);
               if (rangeEnd <= nextStart) setRangeEnd(nextStart + 1);
@@ -100,17 +105,17 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
           </label>
           <span aria-hidden="true">〜</span>
           <label>終了時刻
-            <select value={rangeEnd} onChange={(event) => setRangeEnd(Number(event.target.value))}>
+            <select value={rangeEnd} disabled={disabled} onChange={(event) => setRangeEnd(Number(event.target.value))}>
               {Array.from({ length: 60 - rangeStart }, (_, index) => rangeStart + index + 1)
                 .map((boundary) => <option key={boundary} value={boundary}>{formatSlotEnd(boundary - 1)}</option>)}
             </select>
           </label>
-          <button type="button" className="event-button event-button-primary" disabled={days.length === 0}
+          <button type="button" className="event-button event-button-primary" disabled={disabled || days.length === 0}
             onClick={() => {
               onApplyRange(rangeStart, rangeEnd);
               setBulkStatus(`${days.length}日分に${formatSlotStart(rangeStart)}〜${formatSlotEnd(rangeEnd - 1)}を追加しました。`);
             }}>全候補日に追加</button>
-          <button type="button" className="event-button event-button-secondary" disabled={days.length === 0}
+          <button type="button" className="event-button event-button-secondary" disabled={disabled || days.length === 0}
             onClick={() => {
               onClearAllSlots();
               setBulkStatus('すべての候補時間を解除しました。');
@@ -141,12 +146,12 @@ export function CandidateTimeStep({ days, currentDate, errors, onToggleDate, onR
               <th scope="row" className="event-date-column">
                 <span>{formatDate(day.date)}</span>
                 <button type="button" className="event-remove-date" aria-label={`${formatDate(day.date)}を削除`}
-                  onClick={() => onRemoveDate(day.date)}><Trash2 size={16} aria-hidden="true" /></button>
+                  disabled={disabled} onClick={() => onRemoveDate(day.date)}><Trash2 size={16} aria-hidden="true" /></button>
               </th>
               {SLOTS.map((slot) => <td key={slot}>
                 <button type="button" className="event-time-cell" data-date={day.date} data-slot={slot}
                   aria-label={`${formatDate(day.date)} ${formatSlotStart(slot)}〜${formatSlotEnd(slot)} 選択`}
-                  aria-pressed={selectedSlots.has(slot)}
+                  aria-pressed={selectedSlots.has(slot)} disabled={disabled}
                   onClick={(event) => {
                     // Physical pointers paint on pointerdown; keyboard/AT clicks have detail 0.
                     if (event.detail === 0 || interactionMode === 'move') onToggleSlot(day.date, slot);
