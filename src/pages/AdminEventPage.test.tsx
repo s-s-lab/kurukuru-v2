@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -104,7 +104,7 @@ describe('候補日時専用の管理ページ', () => {
     await screen.findByRole('heading', { name: adminEvent.title });
     expect(screen.getAllByRole('group', { name: /のカレンダー/ })).toHaveLength(2);
     await user.click(screen.getByRole('button', { name: '2026年11月12日を候補日に追加' }));
-    await user.click(screen.getByRole('button', { name: '11月12日 10:00〜10:30 選択' }));
+    await user.click(screen.getByRole('button', { name: '2026年11月12日 10:00〜10:30 選択' }));
     await user.click(screen.getByRole('button', { name: '候補日時を保存' }));
 
     expect(await screen.findByText('候補日時を保存しました。公開回答ボードにも反映されています。')).toBeInTheDocument();
@@ -112,6 +112,107 @@ describe('候補日時専用の管理ページ', () => {
       { date: '2026-11-10', slotIndexes: [18] },
       { date: '2026-11-12', slotIndexes: [20] },
     ] }]);
+  });
+
+  it('選択した時間帯をすべての候補日にまとめて追加して保存する', async () => {
+    storeSession();
+    const requests: unknown[] = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      if (String(input).endsWith('/candidate-slots')) {
+        requests.push(JSON.parse(String(init?.body)));
+        return Response.json(adminEvent);
+      }
+      return Response.json(adminEvent);
+    };
+    const user = userEvent.setup();
+    renderPage(fetcher);
+    await screen.findByRole('heading', { name: adminEvent.title });
+    await user.click(screen.getByRole('button', { name: '2026年11月12日を候補日に追加' }));
+    await user.selectOptions(screen.getByLabelText('開始時刻'), '18');
+    await user.selectOptions(screen.getByLabelText('終了時刻'), '22');
+    await user.click(screen.getByRole('button', { name: '全候補日に追加' }));
+    await user.click(screen.getByRole('button', { name: '候補日時を保存' }));
+
+    expect(requests).toEqual([{ candidateSlots: [
+      { date: '2026-11-10', slotIndexes: [18, 19, 20, 21] },
+      { date: '2026-11-12', slotIndexes: [18, 19, 20, 21] },
+    ] }]);
+  });
+
+  it('時間セルをクリックしてドラッグすると通過した候補時間をまとめて選択する', async () => {
+    storeSession();
+    const fetcher: typeof fetch = async () => Response.json(adminEvent);
+    renderPage(fetcher);
+    await screen.findByRole('heading', { name: adminEvent.title });
+    const start = screen.getByRole('button', { name: /11月10日 09:30〜10:00 選択/ });
+    const middle = screen.getByRole('button', { name: /11月10日 10:00〜10:30 選択/ });
+    const end = screen.getByRole('button', { name: /11月10日 10:30〜11:00 選択/ });
+
+    fireEvent.pointerDown(start, { pointerId: 1, button: 0 });
+    fireEvent.pointerMove(middle, { pointerId: 1, buttons: 1 });
+    fireEvent.pointerMove(end, { pointerId: 1, buttons: 1 });
+    fireEvent.pointerUp(end, { pointerId: 1, button: 0 });
+
+    expect(start).toHaveAttribute('aria-pressed', 'true');
+    expect(middle).toHaveAttribute('aria-pressed', 'true');
+    expect(end).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('保存中は候補日の追加と時間帯の編集を無効にして送信中の内容を保つ', async () => {
+    storeSession();
+    let resolveUpdate!: (response: Response) => void;
+    const fetcher: typeof fetch = async (_input, init) => init?.method === 'PUT'
+      ? new Promise<Response>((resolve) => { resolveUpdate = resolve; })
+      : Response.json(adminEvent);
+    const user = userEvent.setup();
+    renderPage(fetcher);
+    await screen.findByRole('heading', { name: adminEvent.title });
+    const addDate = screen.getByRole('button', { name: '2026年11月12日を候補日に追加' });
+    const timeCell = screen.getByRole('button', { name: /11月10日 09:30〜10:00 選択/ });
+    const saveButton = screen.getByRole('button', { name: '候補日時を保存' });
+
+    await user.click(saveButton);
+
+    expect(saveButton).toBeDisabled();
+    expect(addDate).toBeDisabled();
+    expect(timeCell).toBeDisabled();
+    expect(screen.getByLabelText('開始時刻')).toBeDisabled();
+    expect(screen.getByLabelText('終了時刻')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '全候補日に追加' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'すべて解除' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '2026年11月10日を削除' })).toBeDisabled();
+    await user.click(timeCell);
+    expect(timeCell).toHaveAttribute('aria-pressed', 'false');
+
+    await act(async () => { resolveUpdate(Response.json(adminEvent)); });
+    expect(await screen.findByText('候補日時を保存しました。公開回答ボードにも反映されています。')).toBeInTheDocument();
+  });
+
+  it('選択済みの時間セルからドラッグすると通過した候補時間をまとめて解除する', async () => {
+    storeSession();
+    const eventWithRange = {
+      ...adminEvent,
+      candidateSlots: [
+        { id: '22222222-2222-4222-8222-222222222218', date: '2026-11-10', slotIndex: 18 },
+        { id: '22222222-2222-4222-8222-222222222219', date: '2026-11-10', slotIndex: 19 },
+        { id: '22222222-2222-4222-8222-222222222220', date: '2026-11-10', slotIndex: 20 },
+      ],
+    };
+    const fetcher: typeof fetch = async () => Response.json(eventWithRange);
+    renderPage(fetcher);
+    await screen.findByRole('heading', { name: adminEvent.title });
+    const start = screen.getByRole('button', { name: /11月10日 09:00〜09:30 選択/ });
+    const middle = screen.getByRole('button', { name: /11月10日 09:30〜10:00 選択/ });
+    const end = screen.getByRole('button', { name: /11月10日 10:00〜10:30 選択/ });
+
+    fireEvent.pointerDown(start, { pointerId: 2, button: 0 });
+    fireEvent.pointerMove(middle, { pointerId: 2, buttons: 1 });
+    fireEvent.pointerMove(end, { pointerId: 2, buttons: 1 });
+    fireEvent.pointerUp(end, { pointerId: 2, button: 0 });
+
+    expect(start).toHaveAttribute('aria-pressed', 'false');
+    expect(middle).toHaveAttribute('aria-pressed', 'false');
+    expect(end).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('候補日時更新で認証が切れた場合はログインへ戻す', async () => {
