@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 
 import type { AvailabilityMark, PublicEvent } from '../../functions/events/service';
 import { applyPaint } from '../domain/availability';
+import { readCreatedEventHistory } from '../features/event-history/event-history';
 import { ParticipantResponseForm } from '../features/event-response/ParticipantResponseForm';
 import {
   createParticipantResponse,
@@ -47,6 +48,10 @@ export function ParticipantEventPage({ apiBaseUrl, fetcher }: Props) {
   const [saveMessage, setSaveMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const idempotencyKey = useRef(newIdempotencyKey());
+  const organizerUrl = useMemo(
+    () => readCreatedEventHistory().find(({ eventId: createdEventId }) => createdEventId === eventId)?.organizerUrl,
+    [eventId],
+  );
   const candidateSlotIds = useMemo(
     () => new Set(event?.candidateSlots.map(({ id }) => id) ?? []),
     [event],
@@ -136,7 +141,7 @@ export function ParticipantEventPage({ apiBaseUrl, fetcher }: Props) {
     setEditorOpen(true);
   }
 
-  return <ParticipantResponseForm event={event} draft={draft}
+  return <ParticipantResponseForm event={event} draft={draft} organizerUrl={organizerUrl}
     selectedMark={selectedMark} onSelectedMarkChange={setSelectedMark}
     onDraftChange={(field, value) => setDraft((current) => current ? { ...current, [field]: value } : current)}
     onPaint={(slotIds, mark) => setDraft((current) => current ? {
