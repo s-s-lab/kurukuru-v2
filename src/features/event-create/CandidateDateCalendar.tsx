@@ -50,12 +50,13 @@ function monthIndex(value: Month) {
 }
 
 function CalendarMonth({ month, currentDate, focusedDate, selectedDates, candidateLimitReached,
-  onFocusDate, onDateKeyDown, onToggleDate }: {
+  disabled, onFocusDate, onDateKeyDown, onToggleDate }: {
   month: Month;
   currentDate: string;
   focusedDate: string;
   selectedDates: ReadonlySet<string>;
   candidateLimitReached: boolean;
+  disabled: boolean;
   onFocusDate: (date: string) => void;
   onDateKeyDown: (event: KeyboardEvent<HTMLButtonElement>, date: string) => void;
   onToggleDate: (date: string) => void;
@@ -84,11 +85,11 @@ function CalendarMonth({ month, currentDate, focusedDate, selectedDates, candida
           if (day === null) return <span role="gridcell" className="candidate-calendar-blank" key={`blank-${dayIndex}`} />;
           const date = formatIsoDate(month.year, month.month, day);
           const selected = selectedDates.has(date);
-          const disabled = date < currentDate;
+          const dateDisabled = disabled || date < currentDate;
           const limitBlocked = candidateLimitReached && !selected;
           const action = selected ? '候補日から削除' : '候補日に追加';
           return <span role="gridcell" key={date}>
-            <button type="button" disabled={disabled} aria-disabled={limitBlocked || undefined} aria-pressed={selected}
+            <button type="button" disabled={dateDisabled} aria-disabled={limitBlocked || undefined} aria-pressed={selected}
               aria-label={`${month.year}年${month.month + 1}月${day}日を${action}`}
               data-calendar-date={date} tabIndex={date === focusedDate ? 0 : -1}
               className={date === currentDate ? 'is-today' : undefined}
@@ -103,9 +104,10 @@ function CalendarMonth({ month, currentDate, focusedDate, selectedDates, candida
   </section>;
 }
 
-export function CandidateDateCalendar({ days, currentDate, onToggleDate }: {
+export function CandidateDateCalendar({ days, currentDate, disabled = false, onToggleDate }: {
   days: CandidateDayDraft[];
   currentDate: string;
+  disabled?: boolean;
   onToggleDate: (date: string) => void;
 }) {
   const currentMonth = useMemo(() => parseMonth(currentDate), [currentDate]);
@@ -172,7 +174,8 @@ export function CandidateDateCalendar({ days, currentDate, onToggleDate }: {
     <div className="candidate-calendar-months">
       {visibleMonths.map((month) => <CalendarMonth key={`${month.year}-${month.month}`} month={month}
         currentDate={currentDate} focusedDate={focusedDate} selectedDates={selectedDates}
-        candidateLimitReached={days.length >= 20} onFocusDate={setFocusedDate} onDateKeyDown={handleDateKeyDown}
+        candidateLimitReached={days.length >= 20} disabled={disabled}
+        onFocusDate={setFocusedDate} onDateKeyDown={handleDateKeyDown}
         onToggleDate={onToggleDate} />)}
     </div>
     <p className="candidate-calendar-count" aria-live="polite">選択中：{days.length}日 / 20日まで</p>
