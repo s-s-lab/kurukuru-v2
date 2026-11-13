@@ -19,6 +19,9 @@ describe('Kurukuruの入口', () => {
     );
 
     expect(screen.getByRole('heading', { name: '候補時間を選んで、URLを共有。' })).toBeInTheDocument();
+    expect(document.querySelector('.brand-icon')).toHaveAttribute('src', '/kurukuru-icon-v1.png');
+    expect(document.querySelector('.brand-icon')).toHaveAttribute('width', '30');
+    expect(document.querySelector('.brand-icon')).toHaveAttribute('height', '30');
     expect(screen.getByText(/30分単位の日程調整ツール\s*―参加者が回答すると通知がくるくる！/)).toBeInTheDocument();
     expect(screen.getByText(/ひとつの公開ボードで比べられます/)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: '回答ボードの表示例' })).toBeInTheDocument();
