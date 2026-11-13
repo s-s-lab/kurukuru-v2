@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 
+import { measurePointerPath, paintPointerPath, type PointerPathGeometry, type PointerPoint } from '../../lib/paint-pointer-path';
 import { formatSlotEnd, formatSlotStart } from '../../domain/slots';
 import { DAY_SLOT_INDEXES, formatTimelineHeader } from '../../domain/timeline';
 import { CandidateDateCalendar } from './CandidateDateCalendar';
@@ -31,7 +32,13 @@ type CandidateTimeStepProps = {
   onNext?: () => void;
 };
 
-type PaintGesture = { pointerId: number; selected: boolean; visited: Set<string> };
+type PaintGesture = {
+  pointerId: number;
+  selected: boolean;
+  visited: Set<string>;
+  previous: PointerPoint;
+  geometry: PointerPathGeometry;
+};
 
 export function CandidateTimeStep({ days, currentDate, errors, heading = '候補日時を選択してください',
   description = '参加できる日と時間を、30分単位で選びます。', disabled = false, onToggleDate, onRemoveDate,
@@ -55,7 +62,9 @@ export function CandidateTimeStep({ days, currentDate, errors, heading = '候補
     if (disabled || interactionMode !== 'paint' || event.button !== 0) return;
     const cell = (event.target as HTMLElement).closest<HTMLElement>('[data-slot]');
     if (!cell) return;
-    const active = { pointerId: event.pointerId, selected: cell.getAttribute('aria-pressed') !== 'true', visited: new Set<string>() };
+    const active = { pointerId: event.pointerId, selected: cell.getAttribute('aria-pressed') !== 'true', visited: new Set<string>(),
+      previous: { clientX: event.clientX, clientY: event.clientY },
+      geometry: measurePointerPath(event.currentTarget, '[data-slot]') };
     gesture.current = active;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     paintCell(cell, active);
@@ -65,15 +74,15 @@ export function CandidateTimeStep({ days, currentDate, errors, heading = '候補
     if (disabled) return;
     const active = gesture.current;
     if (!active || active.pointerId !== event.pointerId) return;
-    // Pointer capture retargets events to the scroll area; hit-test the actual cell.
-    const hit = typeof document.elementFromPoint === 'function'
-      ? document.elementFromPoint(event.clientX, event.clientY) : event.target as Element;
-    const cell = hit?.closest<HTMLElement>('[data-slot]');
-    if (cell && event.currentTarget.contains(cell)) paintCell(cell, active);
+    const next = { clientX: event.clientX, clientY: event.clientY };
+    paintPointerPath(event.currentTarget, '[data-slot]', active.geometry, active.previous, next,
+      (cell) => paintCell(cell, active), event.target);
+    active.previous = next;
   }
 
   function endPaint(event: PointerEvent<HTMLDivElement>) {
     if (gesture.current?.pointerId !== event.pointerId) return;
+    if (event.type === 'pointerup') continuePaint(event);
     gesture.current = null;
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
